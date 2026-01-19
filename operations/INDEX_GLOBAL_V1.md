@@ -1,0 +1,26 @@
+# INDEX — Global (V1)
+Date (UTC): 2026-01-19
+But: Point d’entrée unique pour retrouver la doc canonique + le scope embeddable + les sources knowledge (pointeurs LATEST).
+
+## Canonique — Démarrage (ops/)
+1) SESSION_LATEST.md
+2) NEXT_SESSION_HANDOFF_LATEST.md
+3) README_SESSION_GUIDE_LATEST.md
+4) CANONICAL_SET_LATEST.md
+5) DOC_CANONICAL_GOVERNANCE_LATEST.md
+6) INDEX_EMBEDDABLE_LATEST.md
+7) ERRATUM_LATEST.md
+8) PLAN_LATEST.md
+9) BLUEPRINT_LATEST.md
+10) CHECKLIST_LATEST.md
+
+## Knowledge — Pointeurs utiles (knowledge/)
+- mcp-manual:      knowledge/mcp-manual/LATEST.md + LATEST.txt
+- mcp-stack-docs:  knowledge/mcp-stack-docs/LATEST.md
+- sessions:        knowledge/sessions/LATEST.md
+- discovery:       knowledge/discovery/LATEST.txt
+- archives:        knowledge/mcp-manual-archive/exports/  (json/raw.json)
+
+## Règle
+- Ce fichier reste volontairement court.
+- Les détails vivent dans: DOC_CANONICAL_GOVERNANCE_LATEST.md et INDEX_EMBEDDABLE_LATEST.md.
