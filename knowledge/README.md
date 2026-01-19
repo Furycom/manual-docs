@@ -13,3 +13,5 @@ Structure:
 - knowledge/mcp-manual-archive/exports/ : archives de sessions (json/raw.json)
 - knowledge/sessions/exports/ : notes de session isolées importées
 - knowledge/sessions/LATEST.md : pointeur vers la dernière note utile
+- knowledge/discovery/exports/ : sorties de découverte (inventaires, listes candidates)
+- knowledge/discovery/LATEST.txt : pointeur vers la dernière découverte utile
