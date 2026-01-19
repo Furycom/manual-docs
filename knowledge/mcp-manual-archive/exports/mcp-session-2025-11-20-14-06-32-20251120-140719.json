@@ -1,0 +1,65 @@
+{
+  "session_id": "mcp-session-2025-11-20-14-06-32",
+  "manual_updated": true,
+  "updated_manuel_path": "/path/to/manual/mkdocs.yml",
+  "applications_prevue": [
+    "Danswer",
+    "Karakip/Karakeep",
+    "Paperless-ngx",
+    "Vaultwarden",
+    "Tube Archivist",
+    "Uptime Kuma",
+    "Beszel",
+    "Frigate"
+  ],
+  "application_status": {
+    "installé": [
+      "Proxmox",
+      "TrueNAS",
+      "furyai",
+      "Ollama",
+      "OpenWebUI",
+      "Dashy",
+      "Netdata",
+      "Portainer",
+      "MkDocs Material"
+    ],
+    "à installer": [
+      "Danswer",
+      "Karakip/Karakeep",
+      "Paperless-ngx",
+      "Vaultwarden",
+      "Tube Archivist",
+      "Uptime Kuma",
+      "Beszel",
+      "Frigate"
+    ],
+    "idées possibles": []
+  },
+  "domaines_intérêt": [
+    {
+      "nom": "Musique",
+      "projets": [
+        "créer un album",
+        "revisiter mes playlists"
+      ]
+    },
+    {
+      "nom": "Homelab",
+      "projets": [
+        "mise à jour du matériel",
+        "configuration de nouveaux outils"
+      ]
+    }
+  ],
+  "profil_émotionnel": {
+    "type": "chronologie + facettes",
+    "description": "une timeline pour les événements clés, des profils thématiques pour les relations et réactions"
+  },
+  "mission_globale": {
+    "phrases": [
+      "Le homelab MCP et Jarvis existent avant tout pour la maîtrise de mon environnement informatique.",
+      "Le but est d'avoir une vision claire de mes projets, mes intérêts et mes relations émotionnelles."
+    ]
+  }
+}

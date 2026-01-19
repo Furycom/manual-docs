@@ -1,0 +1,27 @@
+{
+  "session_id": "mcp-session-2025-11-22-00-22-48",
+  "informations_utiles": [
+    {
+      "titre": "Profils émotionnel et domaine d'intérêt",
+      "description": "Yann veut créer un profil profond et historique de son être émotionnel pour un projet futur. Les domaines d'intérêt doivent être flexibles et pouvoir s'ajouter ou modifier sur le tas."
+    },
+    {
+      "titre": "Pipeline actuel et à installer",
+      "description": "Le pipeline actuel est compliqué car il y a eu des versions, ajustements et changements de priorité. Il faudra reconstruire ensemble une liste propre 'pipeline actuel', une liste 'à installer' et une liste 'idées possibles'."
+    },
+    {
+      "titre": "Application open source",
+      "description": "Certains applications comme Danswer, Karakip/Karakeep, Paperless-ngx, Vaultwarden, Tube Archivist, Uptime Kuma, Beszel et Frigate ont été validées ou fortement envisagées pour l'homelab final mais leur statut 'installé / à installer' doit être clarifié."
+    }
+  ],
+  "todo": [
+    {
+      "titre": "Réaliser une liste propre 'pipeline actuel'",
+      "description": "Reconstruire ensemble la liste des applications installées, en test ou validées pour installation."
+    },
+    {
+      "titre": "Clarifier le statut d'installation des applications",
+      "description": "Décider de l'état d'avancement (installé / à installer) de chaque application open source listée."
+    }
+  ]
+}

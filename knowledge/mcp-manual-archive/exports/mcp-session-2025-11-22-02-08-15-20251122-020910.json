@@ -1,0 +1,5 @@
+{
+  "session_id": "mcp-session-2025-11-22-02-08-15",
+  "summary": "Objetif : te cataloguer comme être émotionnel, avec un maximum d’informations conservées sur toi. Finalité : un projet futur, pas encore défini, mais qui nécessite une mémoire riche de qui tu es, comment tu réagis, ce que tu aimes/détestes, tes phases, ton parcours, etc. | Ils sont toujours en expansion. Tu veux pouvoir créer de nouveaux domaines « sur le tas », au fur et à mesure que tu découvres ou ravives un intérêt. | Liste non exhaustive des applications installées : Proxmox, VMs principales (supabase-vm, n8n-vm, homeassistant-vm), TrueNAS, furyai avec Ollama + OpenWebUI, la VM mcp-gateway avec les stacks mcp-stack et admin-portal. | Liste non exhaustive des applications validées pour installation : outils type Danswer, Karakip/Karakeep, Paperless-ngx, Vaultwarden, Tube Archivist, Uptime Kuma, Beszel, Frigate, etc. | Liste non exhaustive des projets à long terme : homelab, mécanique auto, projets business, etc.",
+  "todo_items": []
+}

@@ -1,0 +1,44 @@
+{
+  "session_id": "mcp-session-2025-11-28-13-03-36",
+  "user": {
+    "name": "Yann"
+  },
+  "homelab": {
+    "manuel": {
+      "envoye": false,
+      "contenu": null
+    },
+    "applications": {
+      "prévues": [
+        "Danswer",
+        "Karakip/Karakeep",
+        "Paperless-ngx",
+        "Vaultwarden",
+        "Tube Archivist",
+        "Uptime Kuma",
+        "Beszel",
+        "Frigate"
+      ],
+      "installées": null,
+      "à_installer": null
+    },
+    "rôle_de_jarvis": {
+      "mission_globale": [
+        {
+          "phrase": ""
+        }
+      ]
+    },
+    "TODO": [
+      {
+        "description": "Envoyer le fichier du manuel actuel"
+      },
+      {
+        "description": "Lister les applications open source prévues mais pas installées"
+      },
+      {
+        "description": "Clarifier le statut des applications (installées / à installer)"
+      }
+    ]
+  }
+}

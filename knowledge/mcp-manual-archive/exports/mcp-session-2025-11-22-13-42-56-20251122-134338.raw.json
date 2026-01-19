@@ -1,0 +1,51 @@
+{
+  "session_id": "mcp-session-2025-11-22-13-42-56",
+  "mcp_usage_scenarios": [
+    {
+      "scenario_name": "Profondeur du profil émotionnel",
+      "description": "Un système qui garde une chronologie de la vie intérieure ? Ou un système qui te modélise par facettes ?"
+    },
+    {
+      "scenario_name": "Domaines d'intérêt : format mental",
+      "description": "Des grandes catégories stables, des projets à durée plus limitée, ou les deux ?"
+    }
+  ],
+  "domains_of_interest": [
+    {
+      "domain_name": "Musique",
+      "description": ""
+    },
+    {
+      "domain_name": "Films",
+      "description": ""
+    },
+    {
+      "domain_name": "Homelab",
+      "description": ""
+    },
+    {
+      "domain_name": "Mécanique auto",
+      "description": ""
+    }
+  ],
+  "open_source_applications_to_install": [
+    {
+      "app_name": "Danswer",
+      "status": "à installer"
+    },
+    {
+      "app_name": "Karakip/Karakeep",
+      "status": "en test"
+    },
+    {
+      "app_name": "Paperless-ngx",
+      "status": "validé pour installation"
+    }
+  ],
+  "clarify_with_yann": [
+    {
+      "question": "Est-ce que tu as bien compris ton rôle ?",
+      "answer": ""
+    }
+  ]
+}

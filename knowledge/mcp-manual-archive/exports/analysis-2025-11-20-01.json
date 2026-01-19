@@ -1,0 +1,14 @@
+{
+  "session_id": "mcp-session-2025-11-20-01",
+  "summary": "Session de test de l'Archiviste. On vérifie que le journal du homelab peut être mis à jour automatiquement à partir d'une analyse JSON.",
+  "todo_items": [
+    {
+      "title": "Connecter l'Archiviste aux snapshots du manuel",
+      "details": "S'assurer que chaque entrée de journal mentionne l'ID de la version active du manuel."
+    },
+    {
+      "title": "Préparer le workflow LLM aspirateur",
+      "details": "Définir le prompt et le format JSON pour que le LLM génère des fichiers compatibles avec manual_archivist_import.py."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "session_id": "mcp-session-2025-11-28-14-09-03",
+  "summary": "comprehension_notebook : True\nmanual_not_provided : False\napplications_open_source_prevue : [{'name': 'Danswer', 'status': 'validé'}, {'name': 'Karakip/Karakeep', 'status': 'envisagé'}, {'name': 'Paperless-ngx', 'status': 'envisagé'}, {'name': 'Vaultwarden', 'status': 'validé'}, {'name': 'Tube Archivist', 'status': 'envisagé'}, {'name': 'Uptime Kuma', 'status': 'envisagé'}, {'name': 'Beszel', 'status': 'envisagé'}, {'name': 'Frigate', 'status': 'validé'}]\nprofils_emotionnel_domaines_intert : [{'type': 'profil_emotionnel', 'description': 'Chronologie de la vie intérieure'}, {'type': 'domaine_d_interet', 'description': 'Projets à durée limitée'}]\nmission_globale_homelab_jarvis : [{'phrase': 'Le homelab MCP et Jarvis existent avant tout pour...'}]",
+  "todo_items": []
+}

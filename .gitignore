@@ -1,3 +1,21 @@
 # backups / artifacts (non-canon)
 *.bak_*
 **/*.bak_*
+
+# python noise
+**/__pycache__/
+*.pyc
+
+# virtualenvs
+.venv/
+**/.venv/
+
+# logs / temp
+*.log
+*.tmp
+
+# common secret-ish files (never version here)
+*.env
+*.key
+*.pem
+*.token

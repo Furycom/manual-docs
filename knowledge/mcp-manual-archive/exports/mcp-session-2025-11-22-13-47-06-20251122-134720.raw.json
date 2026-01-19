@@ -1,0 +1,62 @@
+{
+  "session_id": "mcp-session-2025-11-22-13-47-06",
+  "todo_list": [
+    {
+      "title": "Rafraîchir la liste des applications open source installées / à installer",
+      "description": "Comparaison entre la liste de l'échange précédent et celle du manuel actuel"
+    },
+    {
+      "title": "Clarifier les applications prévues mais pas encore installées",
+      "description": "Liste des applications ouvertes en discussion pour le homelab final"
+    },
+    {
+      "title": "Fournir une liste unique, propre et à jour de toutes les applis",
+      "description": "Classification selon trois listes : installée / en production, à installer et idées possibles"
+    }
+  ],
+  "context": [
+    {
+      "id": "manuel_homelab",
+      "description": "Fichier du manuel actuel du homelab (mkdocs.yml + page d'accueil + quelques pages clés)",
+      "state": "à envoyer"
+    },
+    {
+      "id": "profil_emotionnel",
+      "description": "Création d'un profil émotionnel enraciné dans la mémoire et les expériences de Yann",
+      "state": "en développement"
+    }
+  ],
+  "schemas": [
+    {
+      "title": "Session MCP - TODO Liste",
+      "type": "object",
+      "properties": {
+        "todo_list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/schemas/TodoItem"
+          }
+        }
+      },
+      "required": [
+        "todo_list"
+      ]
+    },
+    {
+      "title": "Todo Item",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description"
+      ]
+    }
+  ]
+}

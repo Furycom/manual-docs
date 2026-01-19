@@ -1,0 +1,37 @@
+{
+  "session_id": "mcp-session-2025-11-21-14-06-13",
+  "vision_globale": {
+    " Jarvis": {
+      "description": "Système d'aide personnelle intégrée au homelab de Yann"
+    },
+    "profil_emotionnel": {
+      "objectif": "Conserver un maximum d'informations sur les émotions et l'état émotionnel de Yann",
+      "finalité": "Soutenir un projet futur non encore défini"
+    },
+    "domaines_interet": {
+      "description": "Domaines d'intérêt flexibles et en évolution, pouvant inclure des projets à durée limitée ou des catégories stables",
+      "exemples": [
+        "films",
+        "musique",
+        "homelab",
+        "mécanique auto",
+        "projets business"
+      ]
+    },
+    "applications_open_source": {
+      "en_visionneuse": [
+        "Portail (Dashy, Netdata, Portainer)",
+        "Tube Archivist",
+        "Uptime Kuma",
+        "Beszel",
+        "Frigate"
+      ],
+      "à_installer": [],
+      "idées_possibles": []
+    }
+  },
+  "remarques": [
+    "Le fichier du manuel est nécessaire pour clarifier certaines informations",
+    "La liste des applications open source prévues doit être confirmée et mise à jour"
+  ]
+}
