@@ -1,5 +1,16 @@
 # Session BRUCE — 2026-01-18 — Pack A + Pack B (préparation Pack C)
 
+## PACK D — Doc canonique + knowledge + scope embeddable (2026-01-19)
+
+- Repo docs versionné localement: /home/furycom/manual-docs (main)
+- Canonique (8 fichiers) en place: /home/furycom/manual-docs/operations (CANONICAL_SET_LATEST.md)
+- Schéma LATEST opérationnel: *_LATEST.md -> *_V*.md (sauf SESSION_LATEST.md)
+- Knowledge importée et versionnée: /home/furycom/manual-docs/knowledge (sources embeddables)
+- Index embeddable (scope + exclusions + pointeurs): INDEX_EMBEDDABLE_LATEST.md
+
+---
+
+
 ## Contexte opérationnel
 
 * Hôte : `furymcp` (LAN)
