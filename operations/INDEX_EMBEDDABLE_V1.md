@@ -48,3 +48,9 @@ Dossier: `/home/furycom/manual-docs/knowledge`
 ## Règle d’évolution
 - Si une source devient “canonique”: réécrire dans `operations/` (nouvelle version `*_V*.md`) puis repointer `*_LATEST.md`.
 - Sinon: rester dans `knowledge/` avec `LATEST.*` + historiques en `exports/`.
+
+## Pointeurs LATEST — knowledge (infra)
+Dossier: `/home/furycom/manual-docs/knowledge/infra`
+
+- `knowledge/infra/LATEST.md` (delta infra le plus récent)
+- `knowledge/infra/exports/` (historiques infra)
