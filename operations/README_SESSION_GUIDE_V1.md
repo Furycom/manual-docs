@@ -6,6 +6,6 @@
 3) À la fin: mettre à jour SESSION_LATEST.md + incrémenter NEXT_SESSION_HANDOFF_V*.md si nécessaire, puis ajuster les liens *_LATEST.md.
 
 ## Règles
-- Source of truth = les 8 fichiers *_LATEST.md dans ce dossier.
-- Les fichiers *_V*.md sont versionnés; *_LATEST.md pointe toujours vers la dernière version stable.
+- Source of truth = les 8 fichiers canoniques (voir CANONICAL_SET_LATEST.md).
+- Les fichiers *_V*.md sont figés; *_LATEST.md pointe toujours vers la dernière version stable.
 - Aucun scan lourd; sorties bornées; safe-Termix.
