@@ -1,0 +1,38 @@
+# NEXT SESSION HANDOFF — V1
+Date (UTC): 2026-01-19T17:51:54Z
+Machine: furymcp
+Contrainte: safe-Termix (outputs courts, pas de commandes “lourdes”)
+
+## Contexte
+Pack C (Command Queue durcie) est terminé et validé.
+Snapshot: /home/furycom/manual-docs/operations/_snapshots/packC_cmd_queue_20260119_175041.tgz
+
+## Objectif de la prochaine session (priorité stricte)
+1) Documenter proprement l’état final Pack C (où sont les fichiers, comment tester, limites)
+2) Définir le Pack D minimal (prochain incrément) sans élargir le scope
+
+## Actions (à exécuter) — Séquence courte
+A) Vérifier service
+- systemctl is-active bruce-cmd-worker.service
+- systemctl show bruce-cmd-worker.service -p ActiveState -p SubState -p MainPID -p ExecMainStatus
+
+B) Confirmer allowlist (3 tests)
+- systemctl cat bruce-cmd-worker.service
+- systemctl show bruce-cmd-worker.service -p ActiveState
+- (négatif) uname -a; id  => doit être rejeté
+
+C) Vérifier que les résultats sont “compacts”
+- bruce_cmd_results_tail.py --limit 12
+Contrôler la présence des champs:
+stdout_total_bytes, stderr_total_bytes, stdout_truncated, stderr_truncated, stdout_redacted, stderr_redacted, allow_detail
+
+## Décisions à prendre (sans exécution tant que non décidé)
+D1) Est-ce qu’on élargit ALLOWED_SYSTEMD_SERVICES (liste minimale) ?
+D2) Est-ce qu’on veut autoriser systemctl status d’autres units (timers) ?
+D3) Fréquence du loop (LOOP_SLEEP): garder tel quel ou stabiliser à une valeur fixe
+
+## Fichiers “source of truth”
+- /home/furycom/mcp-stack/bruce_cmd_worker.py
+- /home/furycom/mcp-stack/bruce_cmd_enqueue.py
+- /etc/systemd/system/bruce-cmd-worker.service
+- /home/furycom/manual-docs/operations/SESSION_2026-01-18_PACK_A_PACK_B_PACK_C_V2.md

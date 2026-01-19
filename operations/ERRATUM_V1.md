@@ -1,0 +1,8 @@
+# ERRATUM — Canonique (V1)
+
+## Règles
+- Chaque correction/décision durable est ajoutée ici, datée, courte.
+- Pas de roman, uniquement des faits et impacts.
+
+## Entrées
+- 2026-01-19: création du set canonique 8 fichiers *_LATEST.md et procédure de démarrage standard.

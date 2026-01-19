@@ -1,0 +1,321 @@
+# Session BRUCE — 2026-01-18 — Pack A + Pack B (préparation Pack C)
+
+## Contexte opérationnel
+
+* Hôte : `furymcp` (LAN)
+* MCP Gateway : `http://192.168.2.230:4000` (port `4000`)
+* Token : `BRUCE_AUTH_TOKEN = bruce-secret-token-01`
+* Contrainte critique de session :
+
+  * Ne **jamais** arrêter/éteindre le conteneur **Termix** (outil d’accès principal à la CLI).
+  * Appliquer systématiquement un style de commandes **safe-Termix** :
+
+    * éviter les sorties volumineuses (ex. `docker logs`, `docker compose ps` en direct),
+    * rediriger vers fichier + `head/tail` si nécessaire,
+    * privilégier des outputs courts et bornés.
+
+---
+
+## PACK A — “Gateway propre et durable”
+
+### Objectifs
+
+1. Ajouter un endpoint **read-only** : `GET /bruce/config/llm`
+
+   * Expose `base` + `model` (LLM) sans devoir relire les compose/env.
+2. Durcir la surface RAG :
+
+   * timeouts explicites (embedder + supabase),
+   * limites de requête,
+   * rate-limit minimal,
+   * métriques (counters + latence) exposées via un endpoint protégé.
+
+### Changements réalisés
+
+#### A1) Nouveaux endpoints (protégés par token)
+
+* `GET /bruce/config/llm`
+  Réponse :
+  { "ok": true, "base": "...", "model": "..." }
+
+* `GET /bruce/rag/metrics`
+  Réponse :
+
+  * `started_at`
+  * `rate_limited`
+  * `search`: `{ calls, ok, err, last_ms, avg_ms, total_ms, last_error }`
+  * `context`: idem
+
+#### A2) Durcissement RAG
+
+* Rate-limit in-memory par IP :
+
+  * comportement validé (HTTP `429` à partir d’un certain nombre d’appels rapides)
+  * header `Retry-After` prévu (visible lorsque réponse `429`)
+* Timeouts explicites :
+
+  * embedder (via `AbortController`)
+  * supabase rpc (via `AbortController`)
+* Limites sur les inputs :
+
+  * `q` clampée (taille max), `k` clampé
+
+#### A3) OpenAPI mis à jour
+
+`/openapi.json` expose désormais :
+
+* `/bruce/config/llm`
+* `/bruce/rag/metrics`
+* `/bruce/rag/search`
+* `/bruce/rag/context`
+
+### Implémentation (méthode utilisée)
+
+* Source runtime : `/app/server.js` **dans le conteneur** `mcp-gateway`
+* On a extrait `server.js` du conteneur, patché localement, recopié dans le conteneur puis redémarré.
+
+Fichiers/artefacts créés :
+
+* `/home/furycom/mcp-stack/patch_packA_server_js.py` (script de patch)
+* `/home/furycom/mcp-stack/server.js` (version patchée)
+* `/home/furycom/mcp-stack/server.js.bak_YYYYMMDD_HHMMSS` (backup)
+* `/home/furycom/mcp-stack/_gateway_backups/` (snapshots)
+
+### Commandes de validation (preuves)
+
+OpenAPI :
+
+* curl -sS [http://127.0.0.1:4000/openapi.json](http://127.0.0.1:4000/openapi.json) | grep -n "/bruce/config/llm|/bruce/rag/metrics|/bruce/rag/search|/bruce/rag/context"
+
+Config LLM :
+
+* curl -sS [http://127.0.0.1:4000/bruce/config/llm](http://127.0.0.1:4000/bruce/config/llm) -H "Authorization: Bearer bruce-secret-token-01" -H "Content-Type: application/json"
+
+Métriques :
+
+* curl -sS [http://127.0.0.1:4000/bruce/rag/metrics](http://127.0.0.1:4000/bruce/rag/metrics) -H "Authorization: Bearer bruce-secret-token-01" -H "Content-Type: application/json"
+
+RAG search/context :
+
+* curl -sS [http://127.0.0.1:4000/bruce/rag/search](http://127.0.0.1:4000/bruce/rag/search) -H "Authorization: Bearer bruce-secret-token-01" -H "Content-Type: application/json" -d '{"q":"test rag baseline","k":5}'
+* curl -sS [http://127.0.0.1:4000/bruce/rag/context](http://127.0.0.1:4000/bruce/rag/context) -H "Authorization: Bearer bruce-secret-token-01" -H "Content-Type: application/json" -d '{"q":"test rag context baseline","k":3}'
+
+Rate-limit :
+
+* for i in $(seq 1 60); do code="$(curl -s -o /dev/null -w "%{http_code}" [http://127.0.0.1:4000/bruce/rag/search](http://127.0.0.1:4000/bruce/rag/search) -H "Authorization: Bearer bruce-secret-token-01" -H "Content-Type: application/json" -d '{"q":"rate limit test","k":1}')"; echo "$i $code"; done | tail -n 25
+
+---
+
+## PACK B — “RAG durable + commande unique embeddings (hors /tmp)”
+
+### Objectifs
+
+1. Sortir scripts et doc hors de `/tmp` et les ranger **dans le repo**.
+2. Créer une **commande unique** qui :
+
+   * détecte ce qui manque,
+   * calcule les embeddings via l’embedder,
+   * écrit en DB via le gateway (`/tools/supabase/exec-sql`),
+   * produit un résumé court et loggable.
+
+### Arborescence créée
+
+* `tools/rag/`
+* `tools/rag/_runs/` (logs d’exécution)
+* `manual-docs/operations/rag/README.md` (doc opérationnelle)
+
+### Fichiers Pack B livrés
+
+* `tools/rag/bruce_rag_embed.py` : script Python
+* `tools/rag/bruce_rag_embed.sh` : wrapper “commande unique”
+* `manual-docs/operations/rag/README.md`
+
+### Découverte importante (corrige un faux départ)
+
+B0) Faux départ initial :
+
+* Une détection pgvector a trouvé `mcp_memories.embedding`.
+* Cela a fonctionné techniquement, mais ce n’est **pas** la cible principale du RAG.
+
+B1) Cible RAG réelle (confirmée par SQL) :
+
+* `public.bruce_chunks` : chunks (chunk_id, doc_id, chunk_index, texte)
+* `public.bruce_embeddings` : embeddings pgvector (chunk_id, embedding)
+
+Le script final (Pack B.1) :
+
+* lit le texte depuis `bruce_chunks.text`
+* upsert dans `bruce_embeddings (chunk_id, embedding)`
+
+### Commande unique Pack B (usage)
+
+* bash /home/furycom/mcp-stack/tools/rag/bruce_rag_embed.sh 200
+
+Logs :
+
+* /home/furycom/mcp-stack/tools/rag/_runs/
+
+### État final (preuves)
+
+* Missing embeddings (chunks without embedding) : 0
+* SQL : missing = 0
+* Commande batch 200 : “Nothing to do.”
+
+Note : `/tools/supabase/exec-sql` n’accepte pas plusieurs statements dans un seul appel (pas de `;` multiples). Toujours 1 statement par requête.
+
+---
+
+## Incidents / contraintes rencontrées pendant la session
+
+1. Éjections SSH :
+
+* Certaines commandes “bruyantes” et certains appels Docker ont provoqué des éjections de session dans Termix.
+* Contournement : style safe-Termix, outputs courts et bornés.
+
+2. Arrêt involontaire de Termix (incident) :
+
+* Termix a été arrêté par erreur et l’accès CLI a été coupé.
+* Correction : Termix relancé.
+* Règle stricte : ne plus jamais stopper Termix.
+
+---
+
+## État du système à la fin de la session (résumé)
+
+* Pack A : Done (config LLM + durcissement RAG + metrics + OpenAPI OK)
+* Pack B : Done (Pack B.1) — embeddings RAG réels complets (missing = 0) + commande incrémentale prête
+
+---
+
+## PACK C — “Command Queue durcie” (à faire dans la prochaine session)
+
+### Pourquoi Pack C est prioritaire
+
+Quand on accélère l’automatisation, la “command queue” devient un point à risque :
+
+* exécution de commandes potentiellement coûteuses ou dangereuses
+* sorties trop volumineuses (stdout/stderr)
+* commandes bloquantes (pas de timeout)
+* traces inutilisables (pas assez structurées)
+* risque d’exfiltration de secrets dans les logs
+* absence de limites de concurrence et de backoff
+
+Pack C vise : robustesse, sécurité, observabilité, fail-safe.
+
+### Où regarder dans le repo
+
+Dans `/home/furycom/mcp-stack` :
+
+* `bruce_cmd_worker.py`
+* `bruce_cmd_worker_loop.sh`
+
+Pack C part de ces fichiers (inspection puis patch).
+
+### Livrables attendus de Pack C
+
+1. Durcissement de l’exécution (worker)
+
+* Timeout strict par commande (ex. 30s/60s selon type)
+* Limite stdout/stderr (ex. 64 KB chacun) + indication `[TRUNCATED]`
+* Limite taille payload de commande (max chars JSON / args)
+* Retour structuré (status, exit_code, duration_ms, truncated flags)
+* Redaction minimale : ne jamais loguer tokens/keys/Authorization
+
+2. Allowlist stricte
+
+* Pas de shell libre
+* Exécuter seulement des commandes explicitement autorisées
+* Schéma : command_name + args (args validés)
+* Refus clair si commande non autorisée
+
+3. Robustesse queue / lease
+
+* Claim d’un job avec “lease” (éviter double exécution)
+* Statuts explicites : queued, running, done, error, timeout, rejected
+* Retry/backoff (si applicable) borné
+
+4. Journalisation exploitable
+
+* 1 ligne résumé par job
+* Détails bornés en taille (DB ou fichier)
+* Corrélation : job_id / created_at / finished_at
+
+5. Tests reproductibles
+
+* Job OK simple (echo/uname)
+* Job timeout
+* Job big output (>64KB) => truncation
+* Job rejected (hors allowlist)
+* Vérifier stabilité du worker et lisibilité des résultats
+
+### Plan d’exécution Pack C (step-by-step)
+
+C1) Observer l’existant
+
+* Lire bruce_cmd_worker.py : allowlist, subprocess, capture output
+* Identifier : comment job lu (table/view), comment résultat écrit, format attendu
+
+C2) Vérifier le schéma DB (via gateway)
+
+* Utiliser /tools/supabase/exec-sql (1 statement par appel)
+* Identifier tables/colonnes queue/results (statuts, stdout, stderr, exit_code, timing)
+
+C3) Implémenter limites
+
+* Timeout subprocess
+* Capture stdout/stderr bornée + flags truncation
+* Anti-deadlock (watchdog)
+
+C4) Durcir allowlist
+
+* Liste stricte des commandes nécessaires
+* Valider args : pas de ; pas de pipes pas de redirection pas de subshell
+* Format payload stable (JSON)
+
+C5) Résultats structurés + logs courts
+
+* Résumé console (1 ligne)
+* Détails bornés en DB
+* Option : log local borné (rotation)
+
+C6) Tests
+
+* Injecter jobs test
+* Valider branches OK/timeout/truncated/rejected
+
+### Consignes safe-Termix pour Pack C
+
+* Éviter docker logs / docker compose ps en direct si ça éjecte
+* Préférer redirection fichier + tail
+* Ne jamais arrêter Termix
+* 1 commande à la fois, output court, validation, puis étape suivante
+
+---
+
+## Checklist rapide (pour la prochaine session)
+
+1. Confirmer accès stable (Termix OK)
+2. Ouvrir et lire bruce_cmd_worker.py
+3. Identifier tables/colonnes queue/results (exec-sql)
+4. Implémenter timeout + truncation + redaction
+5. Durcir allowlist
+6. Ajouter statuts + timing + résultat structuré
+7. Exécuter tests (OK/timeout/big-output/rejected)
+8. Documenter le comportement final et les limites
+
+---
+
+## PACK C — “Command Queue durcie” — STATUT (mise à jour 2026-01-19T17:50:47Z)
+
+### Résultat
+Pack C est **implémenté et validé** sur `furymcp`.
+
+### Changements effectifs (résumé)
+- Worker `bruce_cmd_worker.py` durci : allowlist stricte, refus métacaractères shell, limite de taille `exec`, timeout contrôlé.
+- Captures stdout/stderr bornées (max bytes), avec indicateurs de troncature.
+- Résultats compacts : métriques `stdout_total_bytes`, `stderr_total_bytes`, `*_truncated`, `*_redacted`.
+- Allowlist étendue : `systemctl show <unit> -p ...`, `systemctl is-active <unit>`, `systemctl cat <unit>` (unit allowlist).
+
+### Preuves (exemples)
+- `systemctl show bruce-cmd-worker.service -p ActiveState -p SubState -p MainPID -p ExecMainStatus` => OK (allowed_systemctl_show)
+- `systemctl cat bruce-cmd-worker.service` => OK (allowed_systemctl_cat)
