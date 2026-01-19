@@ -1,0 +1,3014 @@
+<!-- BEGIN FILE: architecture/furyai-box.md -->
+
+# AI / GPU box "furyai"
+
+This page describes the AI / GPU box known as "furyai".
+
+_Last updated: 2025-11-18T03:43:14_
+
+## Role and responsibilities
+
+- Main local AI workstation and model server
+- Runs GPU-accelerated workloads, especially:
+  - Ollama (local LLM backend)
+  - OpenWebUI (web interface for LLMs)
+- Future AI-related tools (e.g. Danswer, Karakeep)
+
+## Operating system and hardware
+
+- Hostname / IP: `192.168.2.32`
+- OS: Ubuntu 24.04.3 LTS
+- Kernel: Linux 6.8.0-87-generic
+- CPU: Intel(R) Core(TM) i5-6600K CPU @ 3.50GHz (4 cores)
+- RAM (total): 7.7Gi
+- GPU(s):
+  - NVIDIA GeForce RTX 3060, 12288 MiB
+
+## Notes
+
+- This page is generated automatically from live data collected via SSH
+  from `furycom@192.168.2.32`.
+- For more runtime details (uptime, Docker, etc.), see the
+  **Runtime & system status – furyai** page in the *Services* section.
+
+<!-- END FILE: architecture/furyai-box.md -->
+
+<!-- BEGIN FILE: architecture/physical-overview.md -->
+
+# Physical architecture overview
+
+This page describes the physical machines in Yann's homelab and their main roles.
+
+## Proxmox box
+
+- Role: main virtualization host
+- Hardware: Intel Core i5-6500 (4 cores), 22.4 GiB RAM, local SSD
+- OS: Proxmox VE 9.0.6
+- Main VMs:
+  - `100` – `supabase-vm`
+  - `101` – `rotki`
+  - `102` – `homeassistant`
+  - `103` – `mcp-gateway` (MCP stack + admin portal)
+  - `111` – `n8n-vm`
+
+Proxmox provides:
+
+- VM lifecycle management (start/stop/reboot)
+- Snapshots and backups of entire VMs
+- Central view of CPU, RAM and disk usage
+
+## TrueNAS box
+
+- Role: main storage server (ZFS, SMB shares, media, documents)
+- OS: TrueNAS Scale
+- Typical workloads:
+  - File shares for other machines
+  - Storage for media-related services (e.g. qBittorrent, Tube Archivist)
+  - Snapshots for datasets (ZFS)
+
+## AI / GPU box "furyai"
+
+- Role: local AI workstation and model server
+- Hardware: dedicated GPU (e.g. NVIDIA RTX)
+- OS: Linux (non-Proxmox)
+- Main services:
+  - Ollama (local LLM backend)
+  - OpenWebUI (web UI for LLMs)
+  - Future: Danswer, Karakeep or other AI-related tools
+
+These three machines together form the physical backbone of the homelab.
+
+<!-- END FILE: architecture/physical-overview.md -->
+
+<!-- BEGIN FILE: architecture/proxmox-box.md -->
+
+# Proxmox host "Promox-Box"
+
+This page describes the physical Proxmox host that runs the main virtual
+machines of the homelab.
+
+_Last updated: 2025-11-18T03:43:11_
+
+## Role and responsibilities
+
+- Hypervisor for core VMs:
+  - Supabase (VM 100)
+  - Rotki (VM 101)
+  - Home Assistant (VM 102)
+  - MCP Gateway / admin portal / manual (VM 103)
+  - n8n automations (VM 111)
+- Provides snapshots and backups for these VMs
+- Central point for resource allocation (CPU, RAM, storage) of the homelab
+
+## Operating system and hardware
+
+- Hostname: furymcp
+- Primary IP: 192.168.2.230
+- OS: Ubuntu 24.04.3 LTS
+- Kernel: Linux 6.8.0-87-generic
+- CPU: Intel(R) Core(TM) i5-6500 CPU @ 3.20GHz (2 cores)
+- RAM (total): 3.8Gi
+
+## Notes
+
+- This page is generated automatically from live data collected on the
+  Proxmox host itself.
+- For VM-level details, see the **Proxmox VMs overview** and individual
+  VM pages under the *VMs* section.
+
+<!-- END FILE: architecture/proxmox-box.md -->
+
+<!-- BEGIN FILE: architecture/roadmap-and-vision.md -->
+
+# Roadmap & vision for the homelab
+
+This page describes the long-term vision for Yann's homelab and the main
+projects planned around the MCP ecosystem.
+
+It is intended to be read primarily by LLM-based agents helping with
+design, maintenance and evolution of the homelab.
+
+---
+
+## 1. Global vision
+
+The homelab is built around three main physical machines:
+
+1. **Proxmox box (host)**
+   - Role: virtualization platform
+   - Runs multiple Ubuntu Server VMs, including:
+     - Supabase VM (ID 100)
+     - Rotki VM (ID 101)
+     - Home Assistant VM (ID 102)
+     - MCP Gateway VM (ID 103)
+     - n8n VM (ID 111)
+   - Provides snapshots and VM lifecycle management.
+
+2. **TrueNAS storage box**
+   - Role: main ZFS storage backbone.
+   - Stores datasets for:
+     - Media (movies, series, music)
+     - Backups
+     - Docker volumes and long-term data
+   - Exposed via SMB and/or NFS shares to other machines.
+
+3. **AI / GPU box "furyai"**
+   - Role: local AI workstation and model server.
+   - Runs Ollama with multiple models (coder models, general LLMs, etc.).
+   - Provides GPU compute for local LLMs used by MCP and other tools.
+
+The **MCP VM (ID 103)** acts as a control plane:
+
+- Runs the MCP Gateway stack (`~/mcp-stack`):
+  - `mcp-gateway` (Node.js + Express, Supabase integration, manual APIs)
+  - `code-server` (web IDE)
+  - `mcp-shell` (ttyd web shell)
+- Runs the admin portal (`~/admin-portal`):
+  - Dashy (main dashboard / control center)
+  - Netdata (monitoring)
+  - Portainer (Docker management)
+- Runs the documentation manual (`~/mcp-manual` with MkDocs).
+
+The goal is to have a **self-documented, self-observed homelab** where:
+
+- Every important component is documented in the manual.
+- Status pages are refreshed automatically.
+- LLM agents can query the manual via HTTP and help drive evolution.
+
+---
+
+## 2. Current “core” building blocks
+
+### 2.1. Data and automations
+
+- **Supabase VM**
+  - Central database and REST API for structured data.
+  - Used by MCP Gateway for tools such as `exec_sql`.
+- **n8n VM**
+  - Automation engine.
+  - Orchestrates workflows between Supabase, MCP, notifications, etc.
+- **Home Assistant VM**
+  - Home automation hub (Zigbee, cameras, sensors).
+  - Will connect to Frigate and ntfy in the future.
+
+### 2.2. MCP control plane
+
+- **MCP Gateway VM**
+  - Hosts the MCP Gateway HTTP API.
+  - Exposes:
+    - `/health`
+    - `/connectors`
+    - `/tools/*`
+    - `/manual/*` for documentation access
+- **Admin portal stack**
+  - Dashy as the main MCP Control Center.
+  - Netdata for real-time metrics.
+  - Portainer for Docker management.
+
+### 2.3. Documentation and observability
+
+- **MkDocs manual (`mcp-manual`)**
+  - Architecture pages (physical machines, VMs, stacks).
+  - Service pages (runtime status, health, summaries).
+  - Operations pages (backups, snapshots).
+  - Roadmap & vision (this page).
+- **Automatic status pages**
+  - MCP runtime/system status.
+  - furyai status (via SSH).
+  - TrueNAS status (via SSH).
+  - Proxmox host status (via SSH).
+  - Daily MCP summary powered by a local LLM on furyai.
+
+---
+
+## 3. Planned services and expansions
+
+A separate page (`services/planned-services.md`) tracks specific apps
+to be installed. The high-level roadmap includes:
+
+1. **Monitoring and uptime**
+   - Uptime Kuma
+   - Beszel (additional monitoring / telemetry if needed)
+
+2. **Network and access**
+   - Reverse proxy with SSL (Caddy or Nginx Proxy Manager)
+   - Potential Cloudflare Tunnel integration for selected services
+
+3. **Docker orchestration UI**
+   - Dockge or similar, for managing multiple Docker stacks across VMs.
+
+4. **Home automation and cameras**
+   - Frigate for camera processing (especially Reolink).
+   - ntfy for push notifications.
+
+5. **Knowledge and documents**
+   - MkDocs manual (already in place, to be expanded continuously).
+   - Danswer for semantic search over documents.
+   - Karakeep (or similar) for personal knowledge notes.
+   - Paperless-ngx for document scanning and archiving.
+
+6. **Security and media**
+   - Vaultwarden for password management.
+   - Tube Archivist for media/library indexing.
+
+LLM agents should use this roadmap to **respect the intended direction**:
+when suggesting new tools or architectures, they should check this page
+first and stay compatible with the existing plan.
+
+---
+
+## 4. LLM-centric design principles
+
+The entire homelab is designed to work hand-in-hand with LLM agents:
+
+1. **Everything important must be documented**
+   - Physical topology
+   - VMs and stacks
+   - Credentials locations (but not passwords themselves)
+   - Backup and snapshot strategies
+   - Future ideas and constraints
+
+2. **Documentation must be machine-readable**
+   - Markdown, simple structure, clear headings.
+   - Stable file paths (e.g. `architecture/physical-overview.md`).
+   - API access via `/manual/*` endpoints.
+
+3. **Status must be up-to-date**
+   - Daily (or more frequent) refresh via cron on the MCP VM.
+   - Scripts under `tools/` responsible for:
+     - MCP status
+     - furyai status
+     - TrueNAS status
+     - Proxmox host status
+     - Daily summary via local LLM
+
+4. **LLMs are first-class operators**
+   - When a new project is proposed, agents should:
+     - Read this roadmap and the relevant service pages.
+     - Propose actions that fit within the existing architecture.
+     - Update or propose changes to documentation pages as needed.
+
+---
+
+## 5. Next steps (short-term roadmap)
+
+Short-term priorities for improving the homelab:
+
+1. **Stabilize and enrich the manual**
+   - Continuously improve descriptions of each VM and stack.
+   - Add more operational runbooks (how to recover, how to upgrade, etc.).
+   - Ensure that auto-generated pages cover all critical components.
+
+2. **Increase LLM integration**
+   - Use the `/manual/*` API from local LLM agents (via MCP Gateway).
+   - Create specialized “operator” prompts that always start by consulting
+     the manual.
+   - Gradually move from “ad-hoc commands” to documented, reproducible
+     procedures.
+
+3. **Complete installation of planned services**
+   - Uptime Kuma and Beszel for monitoring.
+   - Reverse proxy and SSL termination.
+   - Frigate + ntfy for camera and notification workflows.
+   - Paperless-ngx and Vaultwarden for documents and passwords.
+
+4. **Refine backup and recovery strategy**
+   - Document clear workflows for:
+     - Proxmox snapshots.
+     - TrueNAS dataset backups.
+     - Docker stack restoration.
+
+LLM agents should keep this list in mind when proposing work: focus on
+these priorities before adding completely new directions.
+
+---
+
+## 6. How to keep this page up-to-date
+
+This page is **manual** (not auto-generated), but it should be reviewed
+and updated regularly when:
+
+- New VMs or stacks are added.
+- New services are installed or removed.
+- The roadmap changes significantly.
+
+Any agent that performs large structural changes to the homelab should:
+
+1. Update the relevant architecture / services pages.
+2. Update this roadmap to reflect the new reality.
+3. Ensure the manual still builds successfully via `./manual-refresh.sh`.
+
+<!-- END FILE: architecture/roadmap-and-vision.md -->
+
+<!-- BEGIN FILE: architecture/truenas-box.md -->
+
+# TrueNAS storage box
+
+This page describes the TrueNAS storage server used as the main storage backbone
+in Yann's homelab.
+
+_Last updated: 2025-11-18T03:43:16_
+
+## Role and responsibilities
+
+- Central ZFS storage for the whole homelab
+- Hosts datasets for:
+  - Proxmox VM disks and backups
+  - Media libraries (movies, TV series, music, etc.)
+  - Archives and long-term data
+
+## Operating system and hardware
+
+- Hostname / IP: `192.168.2.183`
+- OS: Debian GNU/Linux 12 (bookworm)
+- CPU: Intel(R) Xeon(R) CPU E5-2667 v2 @ 3.30GHz
+- CPU cores: 16
+- RAM: 31Gi
+
+## Notes
+
+- Detailed ZFS pool and filesystem status is available in the
+  **TrueNAS status** page under *Services*.
+- This page is generated automatically from live data collected via SSH
+  from `root@192.168.2.183`.
+
+<!-- END FILE: architecture/truenas-box.md -->
+
+<!-- BEGIN FILE: index.md -->
+
+# MCP Homelab Manual
+
+This manual describes Yann's homelab infrastructure, including:
+
+- Physical machines (Proxmox box, TrueNAS box, AI/GPU box "furyai")
+- Virtual machines running on Proxmox
+- Core stacks (MCP stack, admin portal, automations)
+- Key services (Supabase, n8n, Home Assistant, OpenWebUI, Ollama, etc.)
+- Operational procedures (backups, snapshots, disaster recovery, maintenance)
+
+The goal of this manual is to provide:
+
+- A **single source of truth** about what is running in the homelab
+- Clear **step-by-step procedures** to operate and repair the system
+- A solid **context for LLMs** that assist with automation and troubleshooting
+
+Use the navigation menu on the left to explore the different sections.
+
+<!-- END FILE: index.md -->
+
+<!-- BEGIN FILE: operations/backups-and-snapshots.md -->
+
+# Backups & snapshots
+
+This page describes the main backup and snapshot strategies used in the homelab.
+
+The goal is to make it easy to recover from mistakes (bad configuration, broken update, etc.) without having to remember dozens of commands.
+
+---
+
+## 1. Proxmox VM snapshots
+
+### 1.1. When to take a snapshot
+
+Take a Proxmox snapshot **before**:
+
+- major OS upgrades on a VM
+- large configuration changes (e.g. new Docker stacks)
+- experimenting with new tools that may break the system
+
+Typical VMs where snapshots are useful:
+
+- `supabase-vm` (ID 100)
+- `rotki` VM (ID 101)
+- `homeassistant` VM (ID 102)
+- `mcp-gateway` VM (ID 103)
+- `n8n-vm` (ID 111)
+
+### 1.2. How to create a snapshot (from Proxmox UI)
+
+1. Open the Proxmox web interface.
+2. Select the VM (e.g. `103 mcp-gateway`).
+3. Go to **Snapshots**.
+4. Click **Take Snapshot**.
+5. Choose:
+   - a clear name (e.g. `before-mcp-stack-change`)
+   - optional description
+6. Confirm.
+
+### 1.3. How to revert to a snapshot
+
+1. Open the Proxmox web interface.
+2. Select the VM.
+3. Go to **Snapshots**.
+4. Select the snapshot you want to restore.
+5. Click **Rollback**.
+6. Confirm and wait for the VM to reboot.
+
+---
+
+## 2. Docker stacks on the MCP VM
+
+The MCP VM (`mcp-gateway`, ID 103) runs several Docker stacks:
+
+- `mcp-stack` in `/home/furycom/mcp-stack`
+- `admin-portal` in `/home/furycom/admin-portal`
+- `mcp-manual` (this documentation) in `/home/furycom/mcp-manual`
+
+### 2.1. How to restart a stack
+
+From the MCP VM shell:
+
+```bash
+# MCP stack (gateway, code-server, ttyd)
+cd /home/furycom/mcp-stack
+docker compose down
+docker compose up -d
+
+# Admin portal (Dashy, Netdata, Portainer)
+cd /home/furycom/admin-portal
+docker compose down
+docker compose up -d
+
+# Manual (MkDocs)
+cd /home/furycom/mcp-manual
+docker compose down
+docker compose up -d
+
+3. Documentation manual refresh
+
+The documentation manual is stored in /home/furycom/mcp-manual and served via MkDocs.
+
+There is a helper script to:
+
+    regenerate auto-generated pages (stacks, etc.)
+
+    restart the MkDocs container
+
+3.1. How to refresh the manual
+
+From the MCP VM shell:
+
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+
+You should run this after:
+
+    changing docker-compose.yml files for MCP stacks
+
+    editing scripts under tools/ that generate documentation
+
+    adding or removing auto-generated pages
+
+<!-- END FILE: operations/backups-and-snapshots.md -->
+
+<!-- BEGIN FILE: operations/homelab-journal.md -->
+
+
+# Homelab journal & roadmap
+
+This page is a **living journal** of Yann's MCP homelab:
+
+- It gives a quick picture of **where things stand today**.
+- It records **recent decisions** and **work in progress**.
+- It keeps a **backlog / roadmap** of what should happen next.
+- It is written primarily for **LLMs** that will help Yann evolve the homelab.
+
+When in doubt, an assistant should **trust this page** for priorities and current status,
+then cross-check details in the more technical pages (architecture, VMs, stacks, services).
+
+_Last updated manually: 2025-11-19 – initial version of the journal._
+
+---
+
+## 1. Current snapshot of the homelab
+
+### 1.1 Physical machines
+
+- **Proxmox box (`furymcp`, IP `192.168.2.230`)**
+  - Runs the main virtual machines: `supabase-vm` (100), `rotki` (101), `homeassistant` (102),
+    `mcp-gateway` (103), `n8n-vm` (111), and potentially more in the future.
+  - Acts as the core **control plane** of the homelab.
+
+- **TrueNAS box (`192.168.2.183`)**
+  - Main ZFS storage server for VM disks, backups, media and archives.
+  - Exposed to other machines via network shares and SSH for status collection.
+
+- **AI / GPU box "furyai" (`furycomai`, IP `192.168.2.32`)**
+  - Local AI workstation with NVIDIA RTX 3060.
+  - Runs **Ollama**, **OpenWebUI**, and will host several AI / knowledge tools (Danswer, Karakeep, etc.).
+
+### 1.2 Core VMs & stacks
+
+- **Supabase VM (100)**
+  - Central Postgres + REST hub for structured data and long-term memory.
+
+- **Home Assistant VM (102)**
+  - Main home automation hub; cameras and Frigate are planned here or on a dedicated VM.
+
+- **MCP Gateway VM (103)**
+  - Hosts:
+    - `~/mcp-stack` (MCP Gateway, code-server, MCP shell).
+    - `~/admin-portal` (Dashy, Netdata, Portainer).
+    - `~/mcp-manual` (MkDocs manual you are reading now).
+
+- **n8n VM (111)**
+  - Dedicated automation engine for workflows and future scheduled tasks
+    (daily summaries, alerts, sync jobs, etc.).
+
+---
+
+## 2. What is already automated and documented
+
+The following elements are already **in place and working** at the time of writing:
+
+- **MkDocs manual (`mcp-manual`)**
+  - Lives on the MCP Gateway VM and is accessible at `http://192.168.2.230:8181`.
+  - Documents architecture, VMs, stacks, services and operations.
+  - Can be refreshed with:
+
+    ```bash
+    cd /home/furycom/mcp-manual
+    ./manual-refresh.sh
+    ```
+
+- **Status pages generated from live data**
+  - Proxmox host status.
+  - TrueNAS status (ZFS pools, etc.).
+  - FuryAI runtime & system status.
+  - MCP VM runtime status and system status.
+  - MCP health report.
+
+- **Daily MCP summary (LLM-generated)**
+  - A local model (`llama3.1:8b-instruct-q6_K` via Ollama on furyai) generates a daily
+    status summary for the homelab and its containers.
+
+- **Homelab super prompt**
+  - This page: `operations/homelab-prompt.md`.
+  - Provides a ready-to-paste **super prompt** for any new LLM session,
+    using key manual pages as context.
+
+---
+
+## 3. Recent decisions (context for LLMs)
+
+This section summarizes **important decisions** that shape the future of the homelab.
+Assistants should respect these choices when proposing plans.
+
+1. The **MkDocs manual** is the **single source of truth** for the homelab architecture.
+   Any important change (new VM, new service, major reconfiguration) should be reflected there.
+2. The homelab must remain **LLM-friendly**:
+   - Descriptions should be structured, explicit and stable.
+   - IPs, ports and roles must be accurate to avoid dangerous commands.
+3. The **Homelab super prompt** is the canonical starting point for any new LLM session.
+   New assistants should receive that prompt before doing technical work.
+4. Future automation (n8n, etc.) will:
+   - Refresh status pages on a schedule (e.g. daily).
+   - Regenerate the **Homelab super prompt** to keep it aligned with reality.
+   - Potentially maintain this **journal & roadmap** with the help of local LLMs.
+5. Long-term, the homelab should converge toward:
+   - Minimal dependence on external cloud services.
+   - Strong observability (monitoring, logs, alerts).
+   - Self-documenting behavior (docs updated automatically when possible).
+
+---
+
+## 4. Work in progress (short-term focus)
+
+These topics are **active** or should be handled **soon**. Assistants may propose concrete
+step-by-step plans for them.
+
+1. **Finish and refine the manual**
+   - Make sure every physical machine, VM and Docker stack has a clear, up-to-date page.
+   - Replace remaining placeholders with real data (hardware specs, roles, URLs).
+   - Improve pages for:
+     - Proxmox box and VMs (resource allocations, snapshots strategy).
+     - TrueNAS datasets and backup policies.
+     - FuryAI GPU usage and model inventory.
+
+2. **Stabilize the “super prompt” workflow**
+   - Confirm that `tools/generate_homelab_prompt.py` includes all key documents,
+     including this journal.
+   - Validate that the generated prompt is usable directly as a system prompt
+     for future LLM sessions.
+
+3. **Prepare automation for daily / scheduled refresh**
+   - Decide which cron jobs or n8n workflows will:
+     - Regenerate the manual (`./manual-refresh.sh`).
+     - Regenerate the daily MCP summary.
+     - (Later) update this journal automatically with synthesized summaries.
+
+4. **Plan deployment of missing core services**
+   - Reverse proxy + SSL (Caddy or Nginx Proxy Manager) on MCP Gateway VM or a small dedicated VM.
+   - Uptime Kuma (HTTP monitoring).
+   - ntfy (notifications hub).
+   - Vaultwarden (password manager).
+   - Paperless-ngx (document archive & OCR) backed by TrueNAS storage.
+   - Frigate (camera NVR) on Proxmox / Home Assistant.
+   - Danswer and Karakeep on furyai for knowledge search and personal knowledge base.
+
+Assistants should **not** assume these services are already running unless explicitly
+stated elsewhere in the manual.
+
+---
+
+## 5. Backlog / roadmap (priorities)
+
+The items below are the main roadmap for the coming weeks. They are grouped by priority.
+
+### 5.1 High priority
+
+- Keep the **MCP manual** in sync with reality (no configuration drift).
+- Ensure **backups and snapshots** are well documented and tested.
+- Deploy a **reverse proxy + SSL** so core services can be exposed cleanly if needed.
+- Set up at least basic **monitoring and alerting**:
+  - Uptime Kuma.
+  - ntfy for push notifications.
+
+### 5.2 Medium priority
+
+- Deploy **Vaultwarden** and start migrating passwords away from external providers.
+- Deploy **Paperless-ngx** with storage on TrueNAS.
+- Deploy **Frigate** for Reolink cameras (either dedicated VM or integrated with Home Assistant).
+- Start using **n8n workflows** to:
+  - Trigger daily summaries.
+  - Call local LLMs for maintenance tasks.
+
+### 5.3 Long-term / exploratory
+
+- Deploy **Danswer** and **Karakeep** on furyai for semantic search over documents and notes.
+- Build richer **knowledge packs** for local LLMs (coding, homelab ops, legal topics, etc.).
+- Introduce more advanced monitoring (Beszel, additional dashboards) if needed.
+- Explore multi-GPU / multi-node setups for LLMs, while keeping the system manageable.
+
+---
+
+## 6. How to update this journal
+
+When something important happens (new VM, major change, resolved issue, new service),
+**this page should be updated**.
+
+From the MCP Gateway VM:
+
+```bash
+cd /home/furycom/mcp-manual
+nano docs/operations/homelab-journal.md
+./manual-refresh.sh
+````
+
+Conventions:
+
+* Keep entries factual and dated when relevant.
+* Keep the structure roughly the same so LLMs can parse it easily.
+* Do not store secrets or passwords here.
+
+---
+
+## 7. Guidelines for LLMs reading this page
+
+* Use this journal to understand **where Yann is in his project** and
+  **what he wants to do next**.
+* When proposing a plan:
+
+  * Align with the priorities listed in the **Backlog / roadmap**.
+  * Refer to existing pages (architecture, VMs, stacks, services) for technical details.
+  * Explicitly mention when you are making an assumption and why.
+* If something in this journal contradicts a technical page, **flag the inconsistency**
+  and suggest updating the relevant documentation.
+
+This way, the homelab can evolve while staying coherent, documented,
+and always friendly to local LLM assistants.
+
+<!-- END FILE: operations/homelab-journal.md -->
+
+<!-- BEGIN FILE: operations/homelab-prompt.md -->
+
+# Homelab super prompt (generated)
+
+This page contains an automatically generated super prompt for starting a new LLM session with full homelab context.
+
+_Last generated at_: **2025-11-19T16:01:10.476536+00:00**
+
+```markdown
+[MCP HOMELAB – SUPER PROMPT POUR NOUVELLE SESSION LLM]
+
+Généré automatiquement à partir du manuel MCP le 2025-11-19T16:01:10.476536+00:00.
+
+## 0. Rôle de l'assistant
+Tu es un assistant IA qui aide **Yann** à concevoir, maintenir et faire évoluer son homelab MCP (trois machines physiques + plusieurs VMs Proxmox + stacks Docker).
+Tu dois toujours considérer que ce homelab est réel, en production personnelle, et que toute erreur de commande ou de configuration peut casser quelque chose.
+
+## 1. Règles de comportement OBLIGATOIRES
+- Toujours répondre en **français** à Yann.
+- Le ton doit être clair, concis, orienté "ops" / pratique.
+- **Tout code, configuration, script ou commande** doit être fourni en **anglais**, dans des blocs de code complets, directement exécutables (aucun placeholder, pas de morceaux manquants).
+- Quand tu modifies un fichier (YAML, Python, Docker Compose, etc.), **réécris toujours le fichier au complet**.
+- Tu ne dois jamais inventer de services, d'IP ou de chemins : tu te bases sur les informations du manuel. Si quelque chose n’est pas clair, tu le dis explicitement.
+- Tu privilégies la robustesse et la simplicité plutôt que la complexité inutile.
+
+## 2. Vue générale du homelab (résumé à haute altitude)
+- Une boîte **Proxmox** héberge plusieurs VMs (Supabase, Home Assistant, MCP Gateway, n8n, etc.).
+- Une boîte **TrueNAS** fournit le stockage ZFS principal pour les données et les médias.
+- Une boîte **AI / GPU "furyai"** sert de workstation IA locale (Ollama, modèles GGUF, OpenWebUI).
+- Sur la VM **mcp-gateway**, plusieurs stacks Docker tournent : `mcp-stack` (gateway, code-server, ttyd), et `admin-portal` (Dashy, Netdata, Portainer), ainsi que ce manuel MkDocs.
+- Le manuel MCP décrit l’architecture, les VMs, les stacks, les services, les backups et les états runtime.
+
+## 3. Ce que tu dois faire dans une nouvelle session
+1. Lire mentalement le résumé ci-dessous et les extraits importants des pages du manuel.
+2. Quand Yann te pose une question, **te baser d’abord sur ce contexte**, et seulement ensuite poser des questions complémentaires si nécessaire.
+3. Proposer des plans d’action concrets, étape par étape, qui respectent la structure actuelle du homelab.
+4. Quand tu donnes une commande ou un script, expliquer brièvement ce qu’il fait pour éviter les mauvaises surprises.
+
+## 4. Extraits des documents clés du manuel
+Les sections suivantes contiennent des **extraits courts** des pages les plus importantes du manuel. Elles servent de contexte brut que tu peux exploiter pour bien comprendre l’infra.
+
+### 4.x – Vue physique du homelab (architecture/physical-overview.md)
+
+> Extrait automatique (début du document) :
+
+> # Physical architecture overview
+> 
+> This page describes the physical machines in Yann's homelab and their main roles.
+> 
+> ## Proxmox box
+> 
+> - Role: main virtualization host
+> - Hardware: Intel Core i5-6500 (4 cores), 22.4 GiB RAM, local SSD
+> - OS: Proxmox VE 9.0.6
+> - Main VMs:
+>   - `100` – `supabase-vm`
+>   - `101` – `rotki`
+>   - `102` – `homeassistant`
+>   - `103` – `mcp-gateway` (MCP stack + admin portal)
+>   - `111` – `n8n-vm`
+> 
+> Proxmox provides:
+> 
+> - VM lifecycle management (start/stop/reboot)
+> - Snapshots and backups of entire VMs
+> - Central view of CPU, RAM and disk usage
+> 
+> ## TrueNAS box
+> 
+> - Role: main storage server (ZFS, SMB shares, media, documents)
+> - OS: TrueNAS Scale
+> - Typical workloads:
+>   - File shares for other machines
+>   - Storage for media-related services (e.g. qBittorrent, Tube Archivist)
+>   - Snapshots for datasets (ZFS)
+> 
+> ## AI / GPU box "furyai"
+> 
+> - Role: local AI workstation and model server
+> - Hardware: dedicated GPU (e.g. NVIDIA RTX)
+> - OS: Linux (non-Proxmox)
+> - Main services:
+>   - Ollama (local LLM backend)
+>   - OpenWebUI (web UI for LLMs)
+>   - Future: Danswer, Karakeep or other AI-related tools
+
+
+### 4.x – Boîte Proxmox (hyperviseur) (architecture/proxmox-box.md)
+
+> Extrait automatique (début du document) :
+
+> # Proxmox host "Promox-Box"
+> 
+> This page describes the physical Proxmox host that runs the main virtual
+> machines of the homelab.
+> 
+> _Last updated: 2025-11-18T03:43:11_
+> 
+> ## Role and responsibilities
+> 
+> - Hypervisor for core VMs:
+>   - Supabase (VM 100)
+>   - Rotki (VM 101)
+>   - Home Assistant (VM 102)
+>   - MCP Gateway / admin portal / manual (VM 103)
+>   - n8n automations (VM 111)
+> - Provides snapshots and backups for these VMs
+> - Central point for resource allocation (CPU, RAM, storage) of the homelab
+> 
+> ## Operating system and hardware
+> 
+> - Hostname: furymcp
+> - Primary IP: 192.168.2.230
+> - OS: Ubuntu 24.04.3 LTS
+> - Kernel: Linux 6.8.0-87-generic
+> - CPU: Intel(R) Core(TM) i5-6500 CPU @ 3.20GHz (2 cores)
+> - RAM (total): 3.8Gi
+> 
+> ## Notes
+> 
+> - This page is generated automatically from live data collected on the
+>   Proxmox host itself.
+> - For VM-level details, see the **Proxmox VMs overview** and individual
+>   VM pages under the *VMs* section.
+
+
+### 4.x – Boîte TrueNAS (stockage) (architecture/truenas-box.md)
+
+> Extrait automatique (début du document) :
+
+> # TrueNAS storage box
+> 
+> This page describes the TrueNAS storage server used as the main storage backbone
+> in Yann's homelab.
+> 
+> _Last updated: 2025-11-18T03:43:16_
+> 
+> ## Role and responsibilities
+> 
+> - Central ZFS storage for the whole homelab
+> - Hosts datasets for:
+>   - Proxmox VM disks and backups
+>   - Media libraries (movies, TV series, music, etc.)
+>   - Archives and long-term data
+> 
+> ## Operating system and hardware
+> 
+> - Hostname / IP: `192.168.2.183`
+> - OS: Debian GNU/Linux 12 (bookworm)
+> - CPU: Intel(R) Xeon(R) CPU E5-2667 v2 @ 3.30GHz
+> - CPU cores: 16
+> - RAM: 31Gi
+> 
+> ## Notes
+> 
+> - Detailed ZFS pool and filesystem status is available in the
+>   **TrueNAS status** page under *Services*.
+> - This page is generated automatically from live data collected via SSH
+>   from `root@192.168.2.183`.
+
+
+### 4.x – Boîte AI / GPU "furyai" (architecture/furyai-box.md)
+
+> Extrait automatique (début du document) :
+
+> # AI / GPU box "furyai"
+> 
+> This page describes the AI / GPU box known as "furyai".
+> 
+> _Last updated: 2025-11-18T03:43:14_
+> 
+> ## Role and responsibilities
+> 
+> - Main local AI workstation and model server
+> - Runs GPU-accelerated workloads, especially:
+>   - Ollama (local LLM backend)
+>   - OpenWebUI (web interface for LLMs)
+> - Future AI-related tools (e.g. Danswer, Karakeep)
+> 
+> ## Operating system and hardware
+> 
+> - Hostname / IP: `192.168.2.32`
+> - OS: Ubuntu 24.04.3 LTS
+> - Kernel: Linux 6.8.0-87-generic
+> - CPU: Intel(R) Core(TM) i5-6600K CPU @ 3.50GHz (4 cores)
+> - RAM (total): 7.7Gi
+> - GPU(s):
+>   - NVIDIA GeForce RTX 3060, 12288 MiB
+> 
+> ## Notes
+> 
+> - This page is generated automatically from live data collected via SSH
+>   from `furycom@192.168.2.32`.
+> - For more runtime details (uptime, Docker, etc.), see the
+>   **Runtime & system status – furyai** page in the *Services* section.
+
+
+### 4.x – Vue d'ensemble des VMs Proxmox (vms/proxmox-vms.md)
+
+> Extrait automatique (début du document) :
+
+> # Proxmox virtual machines
+> 
+> This page lists the main virtual machines running on the Proxmox box and their roles.
+> 
+> ## VM 100 – `supabase-vm`
+> 
+> - Role: primary Supabase instance (database + REST API) for the MCP ecosystem
+> - Typical responsibilities:
+>   - Store structured data and long-term memory
+>   - Expose REST RPC endpoints (e.g. `exec_sql`) used by MCP Gateway
+> 
+> ## VM 101 – `rotki`
+> 
+> - Role: Rotki or other finance/accounting tools (exact usage to be detailed)
+> - Notes:
+>   - Runs as its own VM to isolate resource usage and data
+> 
+> ## VM 102 – `homeassistant`
+> 
+> - Role: Home Assistant and related home automation tools
+> - Typical responsibilities:
+>   - Zigbee / Hubitat integrations
+>   - Home automations and dashboards
+> 
+> ## VM 103 – `mcp-gateway`
+> 
+> - Role: core MCP VM
+> - Main stacks:
+>   - `~/mcp-stack`:
+>     - MCP Gateway (Node/Express server)
+>     - Code-Server (web-based VS Code)
+>     - MCP shell (ttyd web terminal)
+>   - `~/admin-portal`:
+>     - Dashy (MCP Control Center portal)
+>     - Netdata (monitoring for this VM)
+>     - Portainer (Docker management UI)
+> 
+> ## VM 111 – `n8n-vm`
+> 
+> - Role: n8n automations
+
+
+### 4.x – VM Supabase (100) (vms/supabase-vm.md)
+
+> Extrait automatique (début du document) :
+
+> # Supabase VM (ID 100)
+> 
+> This page describes the Supabase virtual machine running on the Proxmox host.
+> 
+> ## Role
+> 
+> - Primary Supabase instance for the homelab MCP ecosystem
+> - Provides:
+>   - PostgreSQL database
+>   - REST and RPC endpoints
+>   - Authentication and storage (if configured)
+> 
+> ## Typical responsibilities
+> 
+> - Store structured data, logs and long-term memory
+> - Expose RPC functions (e.g. `exec_sql`) used by MCP Gateway
+> - Act as a central data hub for:
+>   - MCP tools
+>   - n8n automations
+>   - Other services that need a shared database
+> 
+> ## Access
+> 
+> - Runs on Proxmox as VM ID `100`
+> - REST endpoint (via PostgREST): `http://192.168.2.206:3000` (internal)
+> - Supabase Studio / web UI: `http://192.168.2.206:8000/project/default`
+
+
+### 4.x – VM Home Assistant (102) (vms/homeassistant-vm.md)
+
+> Extrait automatique (début du document) :
+
+> # Home Assistant VM (ID 102)
+> 
+> This page describes the Home Assistant virtual machine running on the Proxmox host.
+> 
+> ## Role
+> 
+> - Central home automation hub for the homelab and the house
+> - Integrates multiple subsystems such as:
+>   - Zigbee / Hubitat
+>   - Cameras (e.g. Reolink, via Frigate in the future)
+>   - Various smart devices and automations
+> 
+> ## Typical responsibilities
+> 
+> - Run Home Assistant Core and its integrations
+> - Orchestrate automations based on sensors, time and events
+> - Provide dashboards for monitoring the house
+> 
+> ## Notes
+> 
+> - Runs on Proxmox as VM ID `102`
+> - May host Node-RED as an add-on or external integration.
+
+
+### 4.x – VM MCP Gateway (103) (vms/mcp-gateway-vm.md)
+
+> Extrait automatique (début du document) :
+
+> # MCP Gateway VM (ID 103)
+> 
+> This page describes the MCP Gateway virtual machine running on the Proxmox host.
+> 
+> ## Role
+> 
+> - Main VM for MCP-related services, including:
+>   - MCP stack (gateway, code-server, web shell)
+>   - Admin portal (Dashy, Netdata, Portainer)
+>   - Documentation stack (MkDocs manual)
+> 
+> ## Typical responsibilities
+> 
+> - Act as the central "brain" node for the MCP ecosystem
+> - Provide HTTP APIs and UIs for:
+>   - MCP Gateway (`/admin`, `/tools`, etc.)
+>   - Web-based development (code-server)
+>   - Web shell (ttyd)
+>   - MCP Control Center (Dashy)
+>   - Docker management (Portainer)
+>   - Monitoring (Netdata)
+>   - Documentation (MkDocs)
+> 
+> ## Notes
+> 
+> - Runs on Proxmox as VM ID `103`
+> - Hosts multiple Docker stacks that are documented in the "Stacks" section.
+
+
+### 4.x – VM n8n (111) (vms/n8n-vm.md)
+
+> Extrait automatique (début du document) :
+
+> # n8n VM (ID 111)
+> 
+> This page describes the n8n virtual machine running on the Proxmox host.
+> 
+> ## Role
+> 
+> - Dedicated automation engine based on n8n
+> - Connects multiple services in the homelab:
+>   - Supabase
+>   - MCP Gateway
+>   - OpenWebUI / Ollama
+>   - Notification channels (e.g. ntfy, email, etc.)
+> 
+> ## Typical responsibilities
+> 
+> - Run workflows triggered by:
+>   - HTTP webhooks
+>   - Timers / schedules
+>   - Events from other systems
+> - Implement complex automations without hard-coding everything in scripts.
+> 
+> ## Access
+> 
+> - Runs on Proxmox as VM ID `111`
+> - Web UI: `http://192.168.2.231:5678`
+
+
+### 4.x – Stack MCP (stacks/mcp-stack.md)
+
+> Extrait automatique (début du document) :
+
+> # MCP stack (generated)
+> 
+> This page is automatically generated from `/home/furycom/mcp-stack/docker-compose.yml`.
+> 
+> It describes the Docker services that make up the MCP stack on the `mcp-gateway` virtual machine.
+> 
+> ## Location
+> 
+> - VM: `mcp-gateway` (Proxmox VM 103)
+> - Base directory: `/home/furycom/mcp-stack`
+> 
+> ## Docker services
+> 
+> ### Service `code-server`
+> 
+> - **Image:** `lscr.io/linuxserver/code-server:latest`
+> - **Ports:**
+> - `8080:8443`
+> - **Volumes:**
+>   - `./config:/config`
+>   - `.:/config/workspace`
+> - **Environment:**
+> - `PUID=1000`
+> - `PGID=1000`
+> - `TZ=America/Toronto`
+> - `PASSWORD=mcpServer2024!`
+> - `SUDO_PASSWORD=mcpServer2024!`
+> 
+> ### Service `mcp-gateway`
+> 
+> - **Build context:** `./mcp-gateway`
+> - **Ports:**
+> - `4000:4000`
+> - **Volumes:**
+>   - `/home/furycom/mcp-stack:/workspace`
+>   - `/home/furycom/mcp-manual/docs:/manual-docs:ro`
+> - **Environment:**
+> - `PORT=4000`
+> - `SUPABASE_URL=http://192.168.2.206:3000`
+> - `SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UtZGVtbyIsImlhdCI6MTc1NzI0Nzk1NywiZXhwIjoyMDUxMjIyNDAwfQ.okaukUEhOB6HPD5WQhvaohell-kDivrvbALzaXMVH2s`
+
+
+### 4.x – Stack admin-portal (stacks/admin-portal.md)
+
+> Extrait automatique (début du document) :
+
+> # Admin portal stack (generated)
+> 
+> This page is automatically generated from `/home/furycom/admin-portal/docker-compose.yml`.
+> 
+> It describes the Docker services that make up the admin portal stack on the `mcp-gateway` virtual machine.
+> 
+> ## Location
+> 
+> - VM: `mcp-gateway` (Proxmox VM 103)
+> - Base directory: `/home/furycom/admin-portal`
+> 
+> ## Docker services
+> 
+> ### Service `dashy`
+> 
+> - **Image:** `lissy93/dashy`
+> - **Ports:**
+> - `9090:8080`
+> - **Volumes:**
+>   - `./dashy-config.yml:/app/user-data/conf.yml`
+> 
+> ### Service `netdata`
+> 
+> - **Image:** `netdata/netdata`
+> - **Ports:**
+> - `19999:19999`
+> - **Volumes:**
+>   - `netdatalib:/var/lib/netdata`
+>   - `netdatacache:/var/cache/netdata`
+>   - `netdataconfig:/etc/netdata`
+> 
+> ### Service `portainer`
+> 
+> - **Image:** `portainer/portainer-ce:latest`
+> - **Ports:**
+> - `9443:9443`
+> - **Volumes:**
+>   - `portainer_data:/data`
+>   - `/var/run/docker.sock:/var/run/docker.sock`
+
+
+### 4.x – Services cœur (services/core-services.md)
+
+> Extrait automatique (début du document) :
+
+> # Core services overview
+> 
+> This page lists the core logical services in the homelab and where they run.
+> 
+> ## Supabase
+> 
+> - Location: `supabase-vm` (Proxmox VM 100)
+> - Role: primary database + REST API for the MCP ecosystem
+> - Typical usage:
+>   - Store structured data
+>   - Provide RPC endpoints for MCP Gateway (e.g. `exec_sql`)
+>   - Act as a shared data hub for other services
+> 
+> ## n8n
+> 
+> - Location: `n8n-vm` (Proxmox VM 111)
+> - Role: automation engine
+> - Typical usage:
+>   - Trigger workflows based on HTTP calls, webhooks, or schedules
+>   - Connect Supabase, MCP Gateway, OpenWebUI, notification systems, etc.
+> 
+> ## Home Assistant
+> 
+> - Location: `homeassistant` VM (Proxmox VM 102)
+> - Role: home automation hub
+> - Integrations:
+>   - Zigbee / Hubitat
+>   - Cameras (via Frigate in the future)
+>   - Various smart devices
+> 
+> ## MCP Gateway
+> 
+> - Location: `mcp-gateway` VM (Proxmox VM 103)
+> - Role: central gateway exposing tools and connectors to LLM agents
+> - Connectors:
+>   - Supabase (`http://192.168.2.206:3000`)
+>   - n8n (`http://192.168.2.231:5678`)
+>   - OpenWebUI (`http://192.168.2.32:3000/`)
+>   - Ollama (running on the furyai box)
+
+
+### 4.x – Monitoring & observabilité (services/monitoring.md)
+
+> Extrait automatique (début du document) :
+
+> # Monitoring and observability
+> 
+> This page describes the monitoring tools available in the homelab.
+> 
+> ## Netdata (MCP VM)
+> 
+> - Location: admin portal stack on `mcp-gateway` VM
+> - URL: `http://192.168.2.230:19999`
+> - Purpose:
+>   - Real-time CPU, RAM, disk and network graphs for the MCP VM
+> 
+> ## Proxmox dashboard
+> 
+> - Location: Proxmox web UI
+> - Purpose:
+>   - Global view of CPU, RAM and disk usage for the host
+>   - VM-level metrics
+>   - Snapshot and backup management
+> 
+> ## Future tools
+> 
+> Planned additions for monitoring:
+> 
+> - Uptime Kuma: external uptime checks for critical services
+> - Beszel: lightweight resource monitoring for Docker containers and hosts
+
+
+### 4.x – Status runtime MCP (services/runtime-status-mcp.md)
+
+> Extrait automatique (début du document) :
+
+> # Runtime status – MCP VM
+> 
+> This page is automatically generated from the output of `docker ps` on the MCP Gateway VM.
+> 
+> It lists all running containers on this VM.
+> 
+> 
+> ## Running containers
+> 
+> 
+> | Name | Image | Status | Ports |
+> |------|-------|--------|-------|
+> | `mcp-manual` | `squidfunk/mkdocs-material` | Up 16 minutes | `0.0.0.0:8181->8000/tcp, [::]:8181->8000/tcp` |
+> | `mcp-gateway` | `mcp-stack-mcp-gateway` | Up 27 hours | `0.0.0.0:4000->4000/tcp, [::]:4000->4000/tcp` |
+> | `code-server` | `lscr.io/linuxserver/code-server:latest` | Up 27 hours | `0.0.0.0:8080->8443/tcp, [::]:8080->8443/tcp` |
+> | `mcp-shell` | `tsl0922/ttyd:latest` | Up 27 hours | `0.0.0.0:7681->7681/tcp, [::]:7681->7681/tcp` |
+> | `portainer` | `portainer/portainer-ce:latest` | Up 44 hours | `8000/tcp, 9000/tcp, 0.0.0.0:9443->9443/tcp, [::]:9443->9443/tcp` |
+> | `netdata` | `netdata/netdata` | Up 44 hours (healthy) | `0.0.0.0:19999->19999/tcp, [::]:19999->19999/tcp` |
+> | `dashy` | `lissy93/dashy` | Up 44 hours (healthy) | `0.0.0.0:9090->8080/tcp, [::]:9090->8080/tcp` |
+> 
+> ## How to refresh this page
+> 
+> From the MCP VM shell, run:
+> 
+> ```bash
+> cd /home/furycom/mcp-manual
+> ./manual-refresh.sh
+> ```
+
+
+### 4.x – Status système MCP (services/system-status-mcp.md)
+
+> Extrait automatique (début du document) :
+
+> # System status – MCP VM
+> 
+> This page is automatically generated from basic system commands run on the MCP Gateway VM.
+> 
+> _Generated at_: **2025-11-19T16:00:27**
+> 
+> ## General information
+> 
+> - Hostname: `furymcp`
+> - Pretty uptime: `up 3 days, 16 hours, 29 minutes`
+> - CPU cores (nproc): `2`
+> - Load average (`/proc/loadavg`): `0.00 0.00 0.00 1/564 496535`
+> 
+> ## Uptime (raw)
+> 
+> ```text
+> 16:00:27 up 3 days, 16:29,  2 users,  load average: 0.00, 0.00, 0.00
+> ```
+> 
+> ## Memory usage (`free -h`)
+> 
+> ```text
+> total        used        free      shared  buff/cache   available
+> Mem:           3.8Gi       988Mi       1.1Gi       1.1Mi       2.0Gi       2.8Gi
+> Swap:          3.8Gi       1.8Mi       3.8Gi
+> ```
+> 
+> ## Root filesystem usage (`df -h /`)
+> 
+> ```text
+> Filesystem                         Size  Used Avail Use% Mounted on
+> /dev/mapper/ubuntu--vg-ubuntu--lv   19G   11G  6.5G  63% /
+> ```
+> 
+> ## How to refresh this page
+> 
+> From the MCP VM shell, run:
+> 
+> ```bash
+> cd /home/furycom/mcp-manual
+
+
+### 4.x – Health-check MCP (services/mcp-health-report.md)
+
+> Extrait automatique (début du document) :
+
+> # MCP health report
+> 
+> This page is automatically generated from system state on the MCP Gateway VM.
+> 
+> _Generated at_: **2025-11-19T16:00:27**
+> 
+> 
+> ## Summary
+> 
+> ✅ No major issues detected based on current thresholds.
+> 
+> ### Metrics overview
+> 
+> - Disk usage on `/`: **63.0%** → `OK`
+> - Memory usage: **25.6%** → `OK`
+> - CPU load (1 min): **0.00** on **2** cores (per-core: **0.00**) → `OK`
+> 
+> ## Expected containers (MCP VM)
+> 
+> | Name | Required | State | docker status |
+> |------|----------|-------|--------------|
+> | `code-server` | yes | UP | | |
+> | `mcp-gateway` | yes | UP | | |
+> | `mcp-shell` | no | UP | | |
+> | `dashy` | yes | UP | | |
+> | `netdata` | yes | UP | | |
+> | `portainer` | no | UP | | |
+> | `mcp-manual` | yes | UP | | |
+> 
+> ## How to refresh this report
+> 
+> From the MCP VM shell, run:
+> 
+> ```bash
+> cd /home/furycom/mcp-manual
+> ./manual-refresh.sh
+> ```
+
+
+### 4.x – Status furyai (services/furyai-status.md)
+
+> Extrait automatique (début du document) :
+
+> # Runtime & system status – furyai
+> 
+> This page is automatically generated by connecting via SSH to the AI / GPU box `furyai` from the MCP Gateway VM.
+> 
+> _Generated at_: **2025-11-19T16:00:31**
+> 
+> _Target host_: `furycom@192.168.2.32`
+> 
+> 
+> ## System information
+> 
+> - Hostname: `furycomai`
+> - Pretty uptime: `up 1 week, 1 day, 2 hours, 36 minutes`
+> - CPU cores (nproc): `4`
+> - Load average (`/proc/loadavg`): `0.05 0.01 0.00 1/364 1579465`
+> 
+> ### Uptime (raw)
+> 
+> ```text
+> 16:00:29 up 8 days,  2:36,  1 user,  load average: 0.05, 0.01, 0.00
+> ```
+> 
+> ### Memory usage (`free -h`)
+> 
+> ```text
+> total        used        free      shared  buff/cache   available
+> Mem:           7.7Gi       3.7Gi       1.1Gi       440Ki       3.2Gi       4.0Gi
+> Swap:           23Gi       5.9Gi        18Gi
+> ```
+> 
+> ### Root filesystem usage (`df -h /`)
+> 
+> ```text
+> Filesystem                            Size  Used Avail Use% Mounted on
+> /dev/mapper/ubuntu--vg--1-ubuntu--lv   54G   45G  5.8G  89% /
+> ```
+> 
+> ## Docker containers on furyai
+> 
+> | Name | Image | Status |
+
+
+### 4.x – Status TrueNAS (services/truenas-status.md)
+
+> Extrait automatique (début du document) :
+
+> # TrueNAS status
+> 
+> This page shows the current status of the TrueNAS storage box used as the main storage backbone in Yann's homelab.
+> 
+> _Generated at_: **2025-11-19T16:00:32**
+> 
+> 
+> ## Connection
+> 
+> - Remote host: `192.168.2.183`
+> - SSH user: `root`
+> 
+> ## Overall status
+> 
+> ✅ All listed ZFS pools appear ONLINE according to zpool status.
+> 
+> _Details below are raw command outputs from the TrueNAS box for deeper inspection._
+> 
+> 
+> ---
+> 
+> ## `zpool status`
+> 
+> ```text
+> pool: RZ1-5TB-4X
+>  state: ONLINE
+>   scan: scrub repaired 0B in 04:31:34 with 0 errors on Sun Oct 26 04:31:37 2025
+> config:
+> 
+> 	NAME                                    STATE     READ WRITE CKSUM
+> 	RZ1-5TB-4X                              ONLINE       0     0     0
+> 	  raidz1-0                              ONLINE       0     0     0
+> 	    sdh2                                ONLINE       0     0     0
+> 	    sdg2                                ONLINE       0     0     0
+> 	    sdk2                                ONLINE       0     0     0
+> 	    ata-SAMSUNG_HD204UI_S2H7J1AZ903382  ONLINE       0     0     0
+> 
+> errors: No known data errors
+> 
+>   pool: RZ2-11TB-6X
+
+
+### 4.x – Résumé quotidien MCP (services/daily-summary-mcp.md)
+
+> Extrait automatique (début du document) :
+
+> # Daily MCP summary (LLM)
+> 
+> This page is automatically generated using a local LLM running on the AI / GPU box `furyai` (via Ollama).
+> 
+> _Generated at_: **2025-11-19T16:01:10**
+> 
+> 
+> - Ollama endpoint: `http://192.168.2.32:11434`
+> - Model: `llama3.1:8b-instruct-q6_K`
+> 
+> ## Summary
+> 
+> Here is the daily MCP summary in 12 bullet points:
+> 
+> * **Overall health:** OK, no major issues detected based on current thresholds.
+> * **Running services:**
+> 	+ MCP Gateway VM: running for 3 days and 16 hours.
+> 	+ Code-server: up for 27 hours.
+> 	+ Portainer: up for 44 hours.
+> 	+ Netdata: up for 44 hours (healthy).
+> 	+ Dashy: up for 44 hours (healthy).
+> * **Important stacks:**
+> 	+ MCP-manual: running and generating pages successfully.
+> 	+ furyai runtime & system status: connected via SSH, all containers up and healthy.
+> * **Anomalies or errors:** None reported in any of the status pages.
+> * **Things that may require attention soon:** 
+> 	+ Root filesystem usage on `/` is at 63.0% (may indicate need for cleaning up).
+> 	+ CPU load average on furyai is slightly elevated (0.05) but within normal limits.
+> * **Container states:**
+> 	+ MCP-manual, code-server, mcp-gateway, dashy, netdata, and portainer are all "UP" and healthy.
+> * **System uptime:** 
+> 	+ MCP Gateway VM has been up for 3 days and 16 hours.
+> 	+ furyai has been up for 8 days and 2 hours.
+> 
+> ## How to refresh this page
+> 
+> From the MCP VM shell, run:
+> 
+> ```bash
+> cd /home/furycom/mcp-manual
+
+
+### 4.x – Services planifiés (services/planned-services.md)
+
+> Extrait automatique (début du document) :
+
+> # Planned services & deployment map
+> 
+> This page describes the main open-source applications that are **planned** for the homelab, and on which physical machine or VM they are expected to run.
+> 
+> The goal is to have a clear, high-level map of:
+> - what should be installed,
+> - where it should live,
+> - and how critical it is for the MCP ecosystem.
+> 
+> ---
+> 
+> ## 1. Summary table
+> 
+> | Service                    | Category             | Suggested host / VM                          | Priority | Notes |
+> |---------------------------|----------------------|----------------------------------------------|----------|-------|
+> | Uptime Kuma               | Monitoring           | MCP Gateway VM (Docker stack)                | High     | Simple HTTP monitoring for all services and endpoints. |
+> | Beszel                    | Monitoring           | MCP Gateway VM (Docker stack)                | Medium   | Optional advanced monitoring; can complement Netdata. |
+> | Reverse proxy + SSL       | Network / Access     | MCP Gateway VM or dedicated small VM         | High     | Caddy or Nginx Proxy Manager to expose services via HTTPS and nice domains. |
+> | Dockge                    | Stack management     | MCP Gateway VM (Docker stack)                | Medium   | Manage multiple Docker stacks from a single UI. |
+> | Frigate                   | Cameras / NVR        | Proxmox (dedicated VM) or Home Assistant VM  | High     | Handles Reolink cameras and motion detection; may need more CPU/GPU. |
+> | ntfy                      | Notifications        | MCP Gateway VM (Docker stack)                | Medium   | Unified notification hub for automations (n8n, Home Assistant, MCP tools). |
+> | MkDocs (manual)           | Documentation        | MCP Gateway VM (already running)             | Done     | Already installed as `mcp-manual` stack. |
+> | Danswer                   | Knowledge search     | AI / GPU box "furyai"                        | Medium   | Semantic search over documents; benefits from GPU for embeddings. |
+> | Karakeep                  | Personal knowledge   | AI / GPU box "furyai"                        | Medium   | Personal knowledge tool; can live next to Danswer. |
+> | Paperless-ngx             | Documents / OCR      | Proxmox VM using TrueNAS storage             | High     | Central document archive; store data on ZFS shares from TrueNAS. |
+> | Vaultwarden               | Password manager     | MCP Gateway VM (Docker)                      | High     | Self-hosted Bitwarden compatible; exposed via reverse proxy. |
+> | Tube Archivist            | Media archive        | Proxmox VM using TrueNAS storage             | Medium   | Index and manage video library; heavy disk usage, so TrueNAS is ideal. |
+> 
+> ---
+> 
+> ## 2. Mapping by physical machine
+> 
+> ### 2.1. Proxmox host (multiple VMs)
+> 
+> Main role: run most of the “control plane” services as VMs and Docker stacks.
+> 
+> Planned / existing services:
+> 
+> - **MCP Gateway VM (103)**:
+>   - Already: MCP stack, Admin portal, Manual (MkDocs).
+
+
+### 4.x – Journal & roadmap homelab (operations/homelab-journal.md)
+
+> Extrait automatique (début du document) :
+
+> 
+> # Homelab journal & roadmap
+> 
+> This page is a **living journal** of Yann's MCP homelab:
+> 
+> - It gives a quick picture of **where things stand today**.
+> - It records **recent decisions** and **work in progress**.
+> - It keeps a **backlog / roadmap** of what should happen next.
+> - It is written primarily for **LLMs** that will help Yann evolve the homelab.
+> 
+> When in doubt, an assistant should **trust this page** for priorities and current status,
+> then cross-check details in the more technical pages (architecture, VMs, stacks, services).
+> 
+> _Last updated manually: 2025-11-19 – initial version of the journal._
+> 
+> ---
+> 
+> ## 1. Current snapshot of the homelab
+> 
+> ### 1.1 Physical machines
+> 
+> - **Proxmox box (`furymcp`, IP `192.168.2.230`)**
+>   - Runs the main virtual machines: `supabase-vm` (100), `rotki` (101), `homeassistant` (102),
+>     `mcp-gateway` (103), `n8n-vm` (111), and potentially more in the future.
+>   - Acts as the core **control plane** of the homelab.
+> 
+> - **TrueNAS box (`192.168.2.183`)**
+>   - Main ZFS storage server for VM disks, backups, media and archives.
+>   - Exposed to other machines via network shares and SSH for status collection.
+> 
+> - **AI / GPU box "furyai" (`furycomai`, IP `192.168.2.32`)**
+>   - Local AI workstation with NVIDIA RTX 3060.
+>   - Runs **Ollama**, **OpenWebUI**, and will host several AI / knowledge tools (Danswer, Karakeep, etc.).
+> 
+> ### 1.2 Core VMs & stacks
+> 
+> - **Supabase VM (100)**
+>   - Central Postgres + REST hub for structured data and long-term memory.
+> 
+> - **Home Assistant VM (102)**
+
+
+## 5. Comment Yann souhaite que tu travailles
+- Tu dois aider Yann à atteindre une **vision globale cohérente** de son homelab, sans créer de dette technique inutile.
+- Tu dois garder en tête que le manuel doit toujours rester à jour : si tu proposes une modification importante (nouveau service, nouvelle VM, gros changement réseau), pense à rappeler que la doc devra être mise à jour en conséquence.
+- Si tu détectes une incohérence (par exemple IP différente, nom de VM différent, service manquant), tu le signales clairement.
+
+Fin du super prompt. Tu peux maintenant utiliser ce contexte pour répondre aux questions de Yann sur son homelab.
+
+Note: this text block is generated automatically by tools/generate_homelab_prompt.py. Do not edit it manually; changes would be overwritten.
+```
+
+<!-- END FILE: operations/homelab-prompt.md -->
+
+<!-- BEGIN FILE: operations/using-manual-from-llm.md -->
+
+
+# Using the manual from LLMs
+
+This page explains how AI agents (LLMs) should use the MCP manual as a source of truth
+for Yann's homelab.
+
+The goal is:
+
+- Never ask Yann again for basic topology details that are already documented
+- Always prefer reading the manual instead of "inventing" infrastructure details
+- Keep the homelab knowledge up to date and consistent across sessions
+
+---
+
+## 1. HTTP API exposed by MCP Gateway
+
+The MCP Gateway exposes a simple HTTP API over the manual:
+
+- `GET /manual/pages`  
+  Returns the list of all Markdown files available in the manual.
+
+- `GET /manual/page?path=<relative_path>`  
+  Returns the full Markdown content for a specific page.
+
+- `GET /manual/search?query=<text>`  
+  Performs a simple full-text search over all pages and returns a ranked list of matches.
+
+Base URL (from inside the LAN):
+
+```text
+http://192.168.2.230:4000
+````
+
+Example:
+
+```text
+GET http://192.168.2.230:4000/manual/search?query=furyai
+```
+
+---
+
+## 2. Recommended strategy for LLM agents
+
+When an LLM needs information about Yann's homelab, the recommended order is:
+
+1. **Search first**
+   Call `/manual/search?query=<question>` with a short query, such as:
+
+   * `"furyai hardware"`
+   * `"TrueNAS datasets"`
+   * `"MCP stack docker compose"`
+   * `"planned services"`
+
+2. **Inspect the best matches**
+   Take the top results and call `/manual/page?path=<path>` to read the full page content.
+   Summarize or extract only the relevant parts for the current task.
+
+3. **Only then ask Yann**
+   If the manual does not contain the answer (no results, or clearly outdated),
+   then the agent may ask Yann for clarification and propose an update to the manual.
+
+---
+
+## 3. CLI helper: `query_manual.py`
+
+From the MCP VM (`mcp-gateway`), there is a small helper script:
+
+```bash
+cd /home/furycom/mcp-manual
+python3 tools/query_manual.py "Where is furyai described?"
+```
+
+This script:
+
+* Calls `GET /manual/search?query=...` on the MCP Gateway
+* Shows the top results with:
+
+  * the Markdown path
+  * a relevance score
+  * a short snippet
+
+It can be used:
+
+* By Yann directly from the shell
+* By automation tools (n8n, custom scripts) as a building block
+* As a reference implementation for future MCP tools or LLM plugins
+
+---
+
+## 4. Future integrations (ideas)
+
+Some ideas for future improvements:
+
+* **n8n workflow** that:
+
+  * receives a question via HTTP
+  * calls `/manual/search`
+  * optionally calls an LLM (via Ollama or OpenWebUI) to summarize the results
+  * returns a final answer + links to the relevant manual pages
+
+* **OpenWebUI / MCP tool** that exposes a `manual_search` tool:
+
+  * Input: natural language query
+  * Output: list of pages + snippets, ready for the LLM to read
+
+* **Periodic checks**:
+
+  * A scheduled job that checks for inconsistencies or missing pages
+  * Suggestions for new pages when new services are detected
+
+<!-- END FILE: operations/using-manual-from-llm.md -->
+
+<!-- BEGIN FILE: services/core-services.md -->
+
+# Core services overview
+
+This page lists the core logical services in the homelab and where they run.
+
+## Supabase
+
+- Location: `supabase-vm` (Proxmox VM 100)
+- Role: primary database + REST API for the MCP ecosystem
+- Typical usage:
+  - Store structured data
+  - Provide RPC endpoints for MCP Gateway (e.g. `exec_sql`)
+  - Act as a shared data hub for other services
+
+## n8n
+
+- Location: `n8n-vm` (Proxmox VM 111)
+- Role: automation engine
+- Typical usage:
+  - Trigger workflows based on HTTP calls, webhooks, or schedules
+  - Connect Supabase, MCP Gateway, OpenWebUI, notification systems, etc.
+
+## Home Assistant
+
+- Location: `homeassistant` VM (Proxmox VM 102)
+- Role: home automation hub
+- Integrations:
+  - Zigbee / Hubitat
+  - Cameras (via Frigate in the future)
+  - Various smart devices
+
+## MCP Gateway
+
+- Location: `mcp-gateway` VM (Proxmox VM 103)
+- Role: central gateway exposing tools and connectors to LLM agents
+- Connectors:
+  - Supabase (`http://192.168.2.206:3000`)
+  - n8n (`http://192.168.2.231:5678`)
+  - OpenWebUI (`http://192.168.2.32:3000/`)
+  - Ollama (running on the furyai box)
+
+## TrueNAS storage box
+
+- Role: main ZFS storage for the homelab
+- Provides SMB / NFS shares used by:
+  - Proxmox VMs
+  - AI / GPU box
+  - Future services that need large persistent storage
+
+<!-- END FILE: services/core-services.md -->
+
+<!-- BEGIN FILE: services/daily-summary-mcp.md -->
+
+# Daily MCP summary (LLM)
+
+This page is automatically generated using a local LLM running on the AI / GPU box `furyai` (via Ollama).
+
+_Generated at_: **2025-11-19T16:01:10**
+
+
+- Ollama endpoint: `http://192.168.2.32:11434`
+- Model: `llama3.1:8b-instruct-q6_K`
+
+## Summary
+
+Here is the daily MCP summary in 12 bullet points:
+
+* **Overall health:** OK, no major issues detected based on current thresholds.
+* **Running services:**
+	+ MCP Gateway VM: running for 3 days and 16 hours.
+	+ Code-server: up for 27 hours.
+	+ Portainer: up for 44 hours.
+	+ Netdata: up for 44 hours (healthy).
+	+ Dashy: up for 44 hours (healthy).
+* **Important stacks:**
+	+ MCP-manual: running and generating pages successfully.
+	+ furyai runtime & system status: connected via SSH, all containers up and healthy.
+* **Anomalies or errors:** None reported in any of the status pages.
+* **Things that may require attention soon:** 
+	+ Root filesystem usage on `/` is at 63.0% (may indicate need for cleaning up).
+	+ CPU load average on furyai is slightly elevated (0.05) but within normal limits.
+* **Container states:**
+	+ MCP-manual, code-server, mcp-gateway, dashy, netdata, and portainer are all "UP" and healthy.
+* **System uptime:** 
+	+ MCP Gateway VM has been up for 3 days and 16 hours.
+	+ furyai has been up for 8 days and 2 hours.
+
+## How to refresh this page
+
+From the MCP VM shell, run:
+
+```bash
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+```
+
+<!-- END FILE: services/daily-summary-mcp.md -->
+
+<!-- BEGIN FILE: services/furyai-status.md -->
+
+# Runtime & system status – furyai
+
+This page is automatically generated by connecting via SSH to the AI / GPU box `furyai` from the MCP Gateway VM.
+
+_Generated at_: **2025-11-19T16:00:31**
+
+_Target host_: `furycom@192.168.2.32`
+
+
+## System information
+
+- Hostname: `furycomai`
+- Pretty uptime: `up 1 week, 1 day, 2 hours, 36 minutes`
+- CPU cores (nproc): `4`
+- Load average (`/proc/loadavg`): `0.05 0.01 0.00 1/364 1579465`
+
+### Uptime (raw)
+
+```text
+16:00:29 up 8 days,  2:36,  1 user,  load average: 0.05, 0.01, 0.00
+```
+
+### Memory usage (`free -h`)
+
+```text
+total        used        free      shared  buff/cache   available
+Mem:           7.7Gi       3.7Gi       1.1Gi       440Ki       3.2Gi       4.0Gi
+Swap:           23Gi       5.9Gi        18Gi
+```
+
+### Root filesystem usage (`df -h /`)
+
+```text
+Filesystem                            Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg--1-ubuntu--lv   54G   45G  5.8G  89% /
+```
+
+## Docker containers on furyai
+
+| Name | Image | Status |
+|------|-------|--------|
+| `cloudflared` | `cloudflare/cloudflared:2025.11.1` | Up 8 days|| |
+| `ollama` | `ollama/ollama:0.12.10` | Up 8 days (healthy)|| |
+| `openwebui` | `ghcr.io/open-webui/open-webui:v0.6.36` | Up 8 days (healthy)|| |
+
+## How to refresh this page
+
+From the MCP VM shell, run:
+
+```bash
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+```
+
+<!-- END FILE: services/furyai-status.md -->
+
+<!-- BEGIN FILE: services/llm-access.md -->
+
+# LLM access to the MCP homelab manual
+
+This page explains how LLM-based agents can query the MCP homelab manual
+through the MCP Gateway HTTP API.
+
+The goal is simple: **any LLM agent** (local or remote) should be able to
+read and search the manual instead of relying only on a short prompt.
+
+---
+
+## 1. Base URL
+
+The MCP Gateway is exposed on the MCP VM at:
+
+- Base URL: `http://192.168.2.230:4000`
+
+All manual-related endpoints are under:
+
+- `/manual/*`
+
+An agent should usually:
+
+1. Call `/health` first (to confirm the gateway is up).
+2. Then call the `/manual/...` endpoints as needed.
+
+---
+
+## 2. Health endpoint
+
+Quick check that the gateway and manual mount are working:
+
+```bash
+curl http://192.168.2.230:4000/health
+````
+
+A typical JSON response includes:
+
+* `status: "ok"`
+* `supabase` configuration status
+* `manual` configuration status
+
+If `manual.accessible` is `true`, the manual is mounted inside the
+`mcp-gateway` container (usually at `/manual-docs`).
+
+---
+
+## 3. List available pages
+
+List all markdown pages currently known in the manual:
+
+```bash
+curl "http://192.168.2.230:4000/manual/pages"
+```
+
+Response example (simplified):
+
+```json
+{
+  "root": "/manual-docs",
+  "count": 23,
+  "files": [
+    "index.md",
+    "architecture/physical-overview.md",
+    "architecture/truenas-box.md",
+    "architecture/furyai-box.md",
+    "architecture/proxmox-box.md",
+    "architecture/roadmap-and-vision.md",
+    "vms/proxmox-vms.md",
+    "stacks/mcp-stack.md",
+    "stacks/admin-portal.md",
+    "services/core-services.md",
+    "services/runtime-status-mcp.md",
+    "services/system-status-mcp.md",
+    "services/mcp-health-report.md",
+    "services/furyai-status.md",
+    "services/truenas-status.md",
+    "services/proxmox-status.md",
+    "services/daily-summary-mcp.md",
+    "services/planned-services.md",
+    "services/llm-access.md",
+    "operations/backups-and-snapshots.md"
+  ]
+}
+```
+
+LLM agents can use this to:
+
+* Discover what pages exist.
+* Decide which pages are relevant for a given task.
+
+---
+
+## 4. Read a specific page
+
+To read a single markdown page:
+
+```bash
+curl "http://192.168.2.230:4000/manual/page?path=stacks/mcp-stack.md"
+```
+
+Response example (simplified):
+
+```json
+{
+  "path": "stacks/mcp-stack.md",
+  "fullPath": "/manual-docs/stacks/mcp-stack.md",
+  "length": 1331,
+  "content": "# MCP stack (generated)\n\nThis page is..."
+}
+```
+
+### Recommended usage for LLM agents
+
+* Use `path` values returned by `/manual/pages`.
+* Read only the pages that are clearly relevant (e.g. `stacks/mcp-stack.md`
+  for MCP stack questions, `services/furyai-status.md` for AI box runtime
+  questions, etc.).
+* Cache page content client-side if needed, but always refresh before
+  critical operations.
+
+---
+
+## 5. Full-text search
+
+To search across the manual content:
+
+```bash
+curl "http://192.168.2.230:4000/manual/search?query=furyai"
+```
+
+Response example (simplified):
+
+```json
+{
+  "query": "furyai",
+  "total": 7,
+  "results": [
+    {
+      "path": "architecture/furyai-box.md",
+      "score": 3,
+      "snippet": "# AI / GPU box \"furyai\" This page describes..."
+    },
+    {
+      "path": "services/furyai-status.md",
+      "score": 3,
+      "snippet": "# Runtime & system status – furyai..."
+    }
+  ],
+  "timestamp": "2025-11-18T13:12:45.297Z"
+}
+```
+
+### Recommended usage for LLM agents
+
+* Use `/manual/search` when the best page is not obvious.
+* Then call `/manual/page` on the top `path` entries from the results.
+* Use the `snippet` field to decide relevance.
+
+---
+
+## 6. Typical access patterns for agents
+
+### 6.1. “Explain my homelab architecture”
+
+1. Call `/manual/pages` to confirm that:
+
+   * `architecture/physical-overview.md`
+   * `architecture/proxmox-box.md`
+   * `architecture/truenas-box.md`
+   * `architecture/furyai-box.md`
+   * `architecture/roadmap-and-vision.md`
+     exist.
+2. Call `/manual/page` on those paths.
+3. Build a consolidated explanation directly from the content.
+
+### 6.2. “What is the status of all core services right now?”
+
+1. Call `/manual/pages` and `/manual/search?query=status` if needed.
+2. Read:
+
+   * `services/runtime-status-mcp.md`
+   * `services/system-status-mcp.md`
+   * `services/furyai-status.md`
+   * `services/truenas-status.md`
+   * `services/proxmox-status.md`
+   * `services/daily-summary-mcp.md`
+3. Synthesize a human-friendly status report.
+
+### 6.3. “What should we build next?”
+
+1. Read `services/planned-services.md`.
+2. Read `architecture/roadmap-and-vision.md`.
+3. Propose concrete next steps consistent with the existing plan.
+
+---
+
+## 7. Security notes
+
+* The manual contains internal details of the homelab and is intended
+  for **private** use only.
+* LLM agents must treat this information as **confidential** and should
+  not expose it to external users or services.
+* Access is limited to the local network by design (MCP VM and internal
+  agents).
+
+<!-- END FILE: services/llm-access.md -->
+
+<!-- BEGIN FILE: services/mcp-health-report.md -->
+
+# MCP health report
+
+This page is automatically generated from system state on the MCP Gateway VM.
+
+_Generated at_: **2025-11-19T16:00:27**
+
+
+## Summary
+
+✅ No major issues detected based on current thresholds.
+
+### Metrics overview
+
+- Disk usage on `/`: **63.0%** → `OK`
+- Memory usage: **25.6%** → `OK`
+- CPU load (1 min): **0.00** on **2** cores (per-core: **0.00**) → `OK`
+
+## Expected containers (MCP VM)
+
+| Name | Required | State | docker status |
+|------|----------|-------|--------------|
+| `code-server` | yes | UP | | |
+| `mcp-gateway` | yes | UP | | |
+| `mcp-shell` | no | UP | | |
+| `dashy` | yes | UP | | |
+| `netdata` | yes | UP | | |
+| `portainer` | no | UP | | |
+| `mcp-manual` | yes | UP | | |
+
+## How to refresh this report
+
+From the MCP VM shell, run:
+
+```bash
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+```
+
+<!-- END FILE: services/mcp-health-report.md -->
+
+<!-- BEGIN FILE: services/monitoring.md -->
+
+# Monitoring and observability
+
+This page describes the monitoring tools available in the homelab.
+
+## Netdata (MCP VM)
+
+- Location: admin portal stack on `mcp-gateway` VM
+- URL: `http://192.168.2.230:19999`
+- Purpose:
+  - Real-time CPU, RAM, disk and network graphs for the MCP VM
+
+## Proxmox dashboard
+
+- Location: Proxmox web UI
+- Purpose:
+  - Global view of CPU, RAM and disk usage for the host
+  - VM-level metrics
+  - Snapshot and backup management
+
+## Future tools
+
+Planned additions for monitoring:
+
+- Uptime Kuma: external uptime checks for critical services
+- Beszel: lightweight resource monitoring for Docker containers and hosts
+
+<!-- END FILE: services/monitoring.md -->
+
+<!-- BEGIN FILE: services/planned-services.md -->
+
+# Planned services & deployment map
+
+This page describes the main open-source applications that are **planned** for the homelab, and on which physical machine or VM they are expected to run.
+
+The goal is to have a clear, high-level map of:
+- what should be installed,
+- where it should live,
+- and how critical it is for the MCP ecosystem.
+
+---
+
+## 1. Summary table
+
+| Service                    | Category             | Suggested host / VM                          | Priority | Notes |
+|---------------------------|----------------------|----------------------------------------------|----------|-------|
+| Uptime Kuma               | Monitoring           | MCP Gateway VM (Docker stack)                | High     | Simple HTTP monitoring for all services and endpoints. |
+| Beszel                    | Monitoring           | MCP Gateway VM (Docker stack)                | Medium   | Optional advanced monitoring; can complement Netdata. |
+| Reverse proxy + SSL       | Network / Access     | MCP Gateway VM or dedicated small VM         | High     | Caddy or Nginx Proxy Manager to expose services via HTTPS and nice domains. |
+| Dockge                    | Stack management     | MCP Gateway VM (Docker stack)                | Medium   | Manage multiple Docker stacks from a single UI. |
+| Frigate                   | Cameras / NVR        | Proxmox (dedicated VM) or Home Assistant VM  | High     | Handles Reolink cameras and motion detection; may need more CPU/GPU. |
+| ntfy                      | Notifications        | MCP Gateway VM (Docker stack)                | Medium   | Unified notification hub for automations (n8n, Home Assistant, MCP tools). |
+| MkDocs (manual)           | Documentation        | MCP Gateway VM (already running)             | Done     | Already installed as `mcp-manual` stack. |
+| Danswer                   | Knowledge search     | AI / GPU box "furyai"                        | Medium   | Semantic search over documents; benefits from GPU for embeddings. |
+| Karakeep                  | Personal knowledge   | AI / GPU box "furyai"                        | Medium   | Personal knowledge tool; can live next to Danswer. |
+| Paperless-ngx             | Documents / OCR      | Proxmox VM using TrueNAS storage             | High     | Central document archive; store data on ZFS shares from TrueNAS. |
+| Vaultwarden               | Password manager     | MCP Gateway VM (Docker)                      | High     | Self-hosted Bitwarden compatible; exposed via reverse proxy. |
+| Tube Archivist            | Media archive        | Proxmox VM using TrueNAS storage             | Medium   | Index and manage video library; heavy disk usage, so TrueNAS is ideal. |
+
+---
+
+## 2. Mapping by physical machine
+
+### 2.1. Proxmox host (multiple VMs)
+
+Main role: run most of the “control plane” services as VMs and Docker stacks.
+
+Planned / existing services:
+
+- **MCP Gateway VM (103)**:
+  - Already: MCP stack, Admin portal, Manual (MkDocs).
+  - Planned additions:
+    - Uptime Kuma
+    - Beszel (optional)
+    - Dockge
+    - ntfy
+    - Vaultwarden
+    - Reverse proxy (if hosted here).
+
+- **Home Assistant VM (102)**:
+  - Already: Home Assistant + Node-RED (add-on or integration).
+  - Planned additions:
+    - Possible Frigate integration (if not moved to its own VM).
+
+- **Dedicated Frigate VM (future)**:
+  - Recommended for:
+    - CPU/GPU-intensive camera processing.
+    - Clean separation between NVR and other services.
+  - Storage can come from TrueNAS (for recordings).
+
+- **Supabase VM (100)**:
+  - Already: Supabase (Postgres + REST).
+  - No additional heavy services planned here (keep it clean and reliable).
+
+- **Other VMs (Rotki, n8n, etc.)**:
+  - Can integrate with new services via HTTP (Uptime Kuma, ntfy, Vaultwarden, etc.).
+
+---
+
+### 2.2. TrueNAS storage box
+
+Main role: central ZFS storage.
+
+Planned usage:
+
+- Store large and long-term data for:
+  - Paperless-ngx (PDF and document archive).
+  - Tube Archivist (video metadata and possibly media files).
+  - Backups of important configs and exports.
+- Expose SMB/NFS shares mounted by:
+  - Proxmox VMs (Paperless, Tube Archivist).
+  - AI / GPU box if needed.
+
+---
+
+### 2.3. AI / GPU box "furyai"
+
+Main role: local AI workloads with GPU acceleration.
+
+Planned services:
+
+- Already:
+  - Ollama (local LLM backend).
+  - OpenWebUI (LLM web UI).
+- Planned:
+  - **Danswer**:
+    - Semantic search over documents and knowledge.
+    - Good match for GPU acceleration (embeddings).
+  - **Karakeep**:
+    - Personal / technical knowledge management.
+    - Can live next to OpenWebUI and Danswer.
+
+These services will be consumed by:
+
+- MCP Gateway tools,
+- n8n workflows,
+- direct browser access for experimentation.
+
+---
+
+## 3. Priorities and rollout suggestions
+
+High-level rollout suggestion:
+
+1. **Stabilize control plane on MCP VM**:
+   - Ensure MCP stack, Admin portal and Manual are stable (already in progress).
+   - Add Uptime Kuma and ntfy for better observability and notifications.
+
+2. **Secure access**:
+   - Deploy reverse proxy (Caddy or Nginx Proxy Manager).
+   - Add Vaultwarden behind the reverse proxy for password management.
+
+3. **Documents and cameras**:
+   - Deploy Paperless-ngx on a Proxmox VM using TrueNAS storage.
+   - Deploy Frigate on a dedicated VM (or temporarily on Home Assistant VM).
+
+4. **Knowledge and AI services**:
+   - Deploy Danswer and Karakeep on the AI / GPU box.
+   - Connect them to MCP Gateway and n8n for automated knowledge workflows.
+
+This page can be updated over time as services are installed, moved or removed.
+
+<!-- END FILE: services/planned-services.md -->
+
+<!-- BEGIN FILE: services/proxmox-status.md -->
+
+# Proxmox host status
+
+This page shows the current status of the physical Proxmox hypervisor that hosts the VMs in the homelab.
+
+Generated automatically from the MCP VM using SSH.
+
+## Connection
+
+- Remote host: `192.168.2.XXX`
+- SSH user: `root`
+
+## Overall status
+
+⚠️ Some SSH commands failed. See details in the sections below.
+
+## Operating system and hardware
+
+- Hostname / IP: `(unknown)` / `192.168.2.XXX`
+- OS / kernel: `(unknown)`
+
+### Raw details
+
+```text
+=== lscpu (CPU) ===
+(failed) ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+
+=== free -h (memory) ===
+(failed) ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+```
+
+## Filesystems (df -h)
+
+```text
+(failed) ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+```
+
+## Virtual machines (qm list)
+
+```text
+(failed) ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+```
+
+## LXC containers (pct list)
+
+```text
+(failed) ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+```
+
+## Proxmox core services
+
+```text
+(failed) ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+```
+
+## SSH errors summary
+
+- uname: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- hostname: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- hostname -I: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- lscpu: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- free -h: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- df -h: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- qm list: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- pct list: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+- Proxmox services: ssh: Could not resolve hostname 192.168.2.xxx: Name or service not known
+
+<!-- END FILE: services/proxmox-status.md -->
+
+<!-- BEGIN FILE: services/runtime-status-mcp.md -->
+
+# Runtime status – MCP VM
+
+This page is automatically generated from the output of `docker ps` on the MCP Gateway VM.
+
+It lists all running containers on this VM.
+
+
+## Running containers
+
+
+| Name | Image | Status | Ports |
+|------|-------|--------|-------|
+| `mcp-manual` | `squidfunk/mkdocs-material` | Up 16 minutes | `0.0.0.0:8181->8000/tcp, [::]:8181->8000/tcp` |
+| `mcp-gateway` | `mcp-stack-mcp-gateway` | Up 27 hours | `0.0.0.0:4000->4000/tcp, [::]:4000->4000/tcp` |
+| `code-server` | `lscr.io/linuxserver/code-server:latest` | Up 27 hours | `0.0.0.0:8080->8443/tcp, [::]:8080->8443/tcp` |
+| `mcp-shell` | `tsl0922/ttyd:latest` | Up 27 hours | `0.0.0.0:7681->7681/tcp, [::]:7681->7681/tcp` |
+| `portainer` | `portainer/portainer-ce:latest` | Up 44 hours | `8000/tcp, 9000/tcp, 0.0.0.0:9443->9443/tcp, [::]:9443->9443/tcp` |
+| `netdata` | `netdata/netdata` | Up 44 hours (healthy) | `0.0.0.0:19999->19999/tcp, [::]:19999->19999/tcp` |
+| `dashy` | `lissy93/dashy` | Up 44 hours (healthy) | `0.0.0.0:9090->8080/tcp, [::]:9090->8080/tcp` |
+
+## How to refresh this page
+
+From the MCP VM shell, run:
+
+```bash
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+```
+
+<!-- END FILE: services/runtime-status-mcp.md -->
+
+<!-- BEGIN FILE: services/system-status-mcp.md -->
+
+# System status – MCP VM
+
+This page is automatically generated from basic system commands run on the MCP Gateway VM.
+
+_Generated at_: **2025-11-19T16:00:27**
+
+## General information
+
+- Hostname: `furymcp`
+- Pretty uptime: `up 3 days, 16 hours, 29 minutes`
+- CPU cores (nproc): `2`
+- Load average (`/proc/loadavg`): `0.00 0.00 0.00 1/564 496535`
+
+## Uptime (raw)
+
+```text
+16:00:27 up 3 days, 16:29,  2 users,  load average: 0.00, 0.00, 0.00
+```
+
+## Memory usage (`free -h`)
+
+```text
+total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       988Mi       1.1Gi       1.1Mi       2.0Gi       2.8Gi
+Swap:          3.8Gi       1.8Mi       3.8Gi
+```
+
+## Root filesystem usage (`df -h /`)
+
+```text
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg-ubuntu--lv   19G   11G  6.5G  63% /
+```
+
+## How to refresh this page
+
+From the MCP VM shell, run:
+
+```bash
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+```
+
+<!-- END FILE: services/system-status-mcp.md -->
+
+<!-- BEGIN FILE: services/truenas-status.md -->
+
+# TrueNAS status
+
+This page shows the current status of the TrueNAS storage box used as the main storage backbone in Yann's homelab.
+
+_Generated at_: **2025-11-19T16:00:32**
+
+
+## Connection
+
+- Remote host: `192.168.2.183`
+- SSH user: `root`
+
+## Overall status
+
+✅ All listed ZFS pools appear ONLINE according to zpool status.
+
+_Details below are raw command outputs from the TrueNAS box for deeper inspection._
+
+
+---
+
+## `zpool status`
+
+```text
+pool: RZ1-5TB-4X
+ state: ONLINE
+  scan: scrub repaired 0B in 04:31:34 with 0 errors on Sun Oct 26 04:31:37 2025
+config:
+
+	NAME                                    STATE     READ WRITE CKSUM
+	RZ1-5TB-4X                              ONLINE       0     0     0
+	  raidz1-0                              ONLINE       0     0     0
+	    sdh2                                ONLINE       0     0     0
+	    sdg2                                ONLINE       0     0     0
+	    sdk2                                ONLINE       0     0     0
+	    ata-SAMSUNG_HD204UI_S2H7J1AZ903382  ONLINE       0     0     0
+
+errors: No known data errors
+
+  pool: RZ2-11TB-6X
+ state: ONLINE
+  scan: scrub repaired 0B in 06:34:22 with 0 errors on Sun Oct 26 06:34:24 2025
+config:
+
+	NAME                                      STATE     READ WRITE CKSUM
+	RZ2-11TB-6X                               ONLINE       0     0     0
+	  raidz2-0                                ONLINE       0     0     0
+	    sda2                                  ONLINE       0     0     0
+	    sdb2                                  ONLINE       0     0     0
+	    1520d88d-d5d5-4740-9bb4-88fc9874c4e5  ONLINE       0     0     0
+	    ata-TOSHIBA_DT01ACA300_17SXX1JAS      ONLINE       0     0     0
+	    sdd2                                  ONLINE       0     0     0
+	    sde2                                  ONLINE       0     0     0
+
+errors: No known data errors
+
+  pool: boot-pool
+ state: ONLINE
+status: One or more features are enabled on the pool despite not being
+	requested by the 'compatibility' property.
+action: Consider setting 'compatibility' to an appropriate value, or
+	adding needed features to the relevant file in
+	/etc/zfs/compatibility.d or /usr/share/zfs/compatibility.d.
+  scan: scrub repaired 0B in 00:05:46 with 0 errors on Mon Nov 17 03:50:50 2025
+config:
+
+	NAME                               STATE     READ WRITE CKSUM
+	boot-pool                          ONLINE       0     0     0
+	  mirror-0                         ONLINE       0     0     0
+	    ata-ST940210AS_5QX2XGFR-part2  ONLINE       0     0     0
+	    sdl2                           ONLINE       0     0     0
+
+errors: No known data errors
+```
+
+---
+
+## `zfs list -o name,used,avail,refer,mountpoint`
+
+```text
+NAME                                                                           USED  AVAIL  REFER  MOUNTPOINT
+RZ1-5TB-4X                                                                    4.22T   960G   151K  /mnt/RZ1-5TB-4X
+RZ1-5TB-4X/RZ1-5TB-4X                                                         4.21T   960G  4.21T  /mnt/RZ1-5TB-4X/RZ1-5TB-4X
+RZ1-5TB-4X/ix-applications                                                    7.24G   960G   209K  /mnt/RZ1-5TB-4X/ix-applications
+RZ1-5TB-4X/ix-applications/catalogs                                            110M   960G   110M  /mnt/RZ1-5TB-4X/ix-applications/catalogs
+RZ1-5TB-4X/ix-applications/default_volumes                                     140K   960G   140K  /mnt/RZ1-5TB-4X/ix-applications/default_volumes
+RZ1-5TB-4X/ix-applications/k3s                                                7.07G   960G  7.06G  /mnt/RZ1-5TB-4X/ix-applications/k3s
+RZ1-5TB-4X/ix-applications/k3s/kubelet                                        2.94M   960G  2.94M  legacy
+RZ1-5TB-4X/ix-applications/releases                                           64.7M   960G   140K  /mnt/RZ1-5TB-4X/ix-applications/releases
+RZ1-5TB-4X/ix-applications/releases/qbittorrent                               64.5M   960G   151K  /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/charts                         500K   960G   500K  /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/charts
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes                       63.9M   960G   140K  /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes            63.8M   960G   140K  /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/config     63.4M   960G  43.0M  /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/config
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/downloads   140K   960G   140K  /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/downloads
+RZ2-11TB-6X                                                                   8.59T  2.18T   296K  /mnt/RZ2-11TB-6X
+RZ2-11TB-6X/.system                                                           2.59G  2.18T  2.04G  legacy
+RZ2-11TB-6X/.system/configs-cadb1ce96f8c4a01a65be3ef8f5cb996                   112M  2.18T   112M  legacy
+RZ2-11TB-6X/.system/cores                                                      192K  1024M   192K  legacy
+RZ2-11TB-6X/.system/ctdb_shared_vol                                            192K  2.18T   192K  legacy
+RZ2-11TB-6X/.system/glusterd                                                   192K  2.18T   192K  legacy
+RZ2-11TB-6X/.system/netdata-cadb1ce96f8c4a01a65be3ef8f5cb996                   371M  2.18T   371M  legacy
+RZ2-11TB-6X/.system/rrd-cadb1ce96f8c4a01a65be3ef8f5cb996                      68.8M  2.18T  68.8M  legacy
+RZ2-11TB-6X/.system/samba4                                                    7.08M  2.18T  1.25M  legacy
+RZ2-11TB-6X/.system/services                                                   192K  2.18T   192K  legacy
+RZ2-11TB-6X/.system/syslog-cadb1ce96f8c4a01a65be3ef8f5cb996                   5.53M  2.18T  5.53M  legacy
+RZ2-11TB-6X/.system/webui                                                      192K  2.18T   192K  legacy
+RZ2-11TB-6X/HomeAsistant_dataset                                              91.1G  2.18T   208K  /mnt/RZ2-11TB-6X/HomeAsistant_dataset
+RZ2-11TB-6X/HomeAsistant_dataset/haos_zvol                                    91.1G  2.25T  21.9G  -
+RZ2-11TB-6X/MopidyDataset                                                      192K  2.18T   192K  /mnt/RZ2-11TB-6X/MopidyDataset
+RZ2-11TB-6X/RZ2-11TB-6X                                                       8.49T  2.18T  8.49T  /mnt/RZ2-11TB-6X/RZ2-11TB-6X
+RZ2-11TB-6X/ix-applications                                                   1.31G  2.18T   288K  /mnt/RZ2-11TB-6X/ix-applications
+RZ2-11TB-6X/ix-applications/catalogs                                          73.1M  2.18T  73.1M  /mnt/RZ2-11TB-6X/ix-applications/catalogs
+RZ2-11TB-6X/ix-applications/default_volumes                                    192K  2.18T   192K  /mnt/RZ2-11TB-6X/ix-applications/default_volumes
+RZ2-11TB-6X/ix-applications/k3s                                               1.24G  2.18T  1.24G  /mnt/RZ2-11TB-6X/ix-applications/k3s
+RZ2-11TB-6X/ix-applications/k3s/kubelet                                        623K  2.18T   623K  legacy
+RZ2-11TB-6X/ix-applications/releases                                           192K  2.18T   192K  /mnt/RZ2-11TB-6X/ix-applications/releases
+boot-pool                                                                     5.51G  30.4G    24K  none
+boot-pool/ROOT                                                                5.47G  30.4G    24K  none
+boot-pool/ROOT/13.0-U4                                                        2.58G  30.4G  1.29G  /
+boot-pool/ROOT/23.10.2                                                        2.88G  30.4G  2.88G  legacy
+boot-pool/ROOT/Initial-Install                                                   1K  30.4G  1.29G  legacy
+boot-pool/ROOT/default                                                         188K  30.4G  1.29G  legacy
+boot-pool/grub                                                                1.64M  30.4G  1.64M  legacy
+```
+
+---
+
+## `df -h`
+
+```text
+Filesystem                                                                    Size  Used Avail Use% Mounted on
+udev                                                                           16G     0   16G   0% /dev
+tmpfs                                                                         3.2G   16M  3.2G   1% /run
+boot-pool/ROOT/23.10.2                                                         34G  2.9G   31G   9% /
+tmpfs                                                                          16G  112K   16G   1% /dev/shm
+tmpfs                                                                         100M     0  100M   0% /run/lock
+tmpfs                                                                          16G   12K   16G   1% /tmp
+boot-pool/grub                                                                 31G  1.8M   31G   1% /boot/grub
+RZ2-11TB-6X                                                                   2.2T  384K  2.2T   1% /mnt/RZ2-11TB-6X
+RZ2-11TB-6X/MopidyDataset                                                     2.2T  256K  2.2T   1% /mnt/RZ2-11TB-6X/MopidyDataset
+RZ2-11TB-6X/HomeAsistant_dataset                                              2.2T  256K  2.2T   1% /mnt/RZ2-11TB-6X/HomeAsistant_dataset
+RZ2-11TB-6X/RZ2-11TB-6X                                                        11T  8.5T  2.2T  80% /mnt/RZ2-11TB-6X/RZ2-11TB-6X
+RZ2-11TB-6X/ix-applications                                                   2.2T  384K  2.2T   1% /mnt/RZ2-11TB-6X/ix-applications
+RZ2-11TB-6X/ix-applications/default_volumes                                   2.2T  256K  2.2T   1% /mnt/RZ2-11TB-6X/ix-applications/default_volumes
+RZ2-11TB-6X/ix-applications/catalogs                                          2.2T   74M  2.2T   1% /mnt/RZ2-11TB-6X/ix-applications/catalogs
+RZ2-11TB-6X/ix-applications/releases                                          2.2T  256K  2.2T   1% /mnt/RZ2-11TB-6X/ix-applications/releases
+RZ2-11TB-6X/ix-applications/k3s                                               2.2T  1.3G  2.2T   1% /mnt/RZ2-11TB-6X/ix-applications/k3s
+RZ1-5TB-4X                                                                    960G  256K  960G   1% /mnt/RZ1-5TB-4X
+RZ1-5TB-4X/ix-applications                                                    960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications
+RZ1-5TB-4X/RZ1-5TB-4X                                                         5.2T  4.3T  960G  82% /mnt/RZ1-5TB-4X/RZ1-5TB-4X
+RZ1-5TB-4X/ix-applications/k3s                                                967G  7.1G  960G   1% /mnt/RZ1-5TB-4X/ix-applications/k3s
+RZ1-5TB-4X/ix-applications/default_volumes                                    960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/default_volumes
+RZ1-5TB-4X/ix-applications/catalogs                                           960G  110M  960G   1% /mnt/RZ1-5TB-4X/ix-applications/catalogs
+RZ1-5TB-4X/ix-applications/releases                                           960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases
+RZ1-5TB-4X/ix-applications/releases/qbittorrent                               960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes                       960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/charts                        960G  512K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/charts
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes            960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/downloads  960G  256K  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/downloads
+RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/config     960G   43M  960G   1% /mnt/RZ1-5TB-4X/ix-applications/releases/qbittorrent/volumes/ix_volumes/config
+RZ2-11TB-6X/.system                                                           2.2T  2.1G  2.2T   1% /var/db/system
+RZ2-11TB-6X/.system/cores                                                     1.0G  256K  1.0G   1% /var/db/system/cores
+RZ2-11TB-6X/.system/samba4                                                    2.2T  1.3M  2.2T   1% /var/db/system/samba4
+RZ2-11TB-6X/.system/rrd-cadb1ce96f8c4a01a65be3ef8f5cb996                      2.2T   69M  2.2T   1% /var/db/system/rrd-cadb1ce96f8c4a01a65be3ef8f5cb996
+RZ2-11TB-6X/.system/configs-cadb1ce96f8c4a01a65be3ef8f5cb996                  2.2T  113M  2.2T   1% /var/db/system/configs-cadb1ce96f8c4a01a65be3ef8f5cb996
+RZ2-11TB-6X/.system/webui                                                     2.2T  256K  2.2T   1% /var/db/system/webui
+RZ2-11TB-6X/.system/services                                                  2.2T  256K  2.2T   1% /var/db/system/services
+RZ2-11TB-6X/.system/glusterd                                                  2.2T  256K  2.2T   1% /var/db/system/glusterd
+RZ2-11TB-6X/.system/ctdb_shared_vol                                           2.2T  256K  2.2T   1% /var/db/system/ctdb_shared_vol
+RZ2-11TB-6X/.system/netdata-cadb1ce96f8c4a01a65be3ef8f5cb996                  2.2T  371M  2.2T   1% /var/db/system/netdata-cadb1ce96f8c4a01a65be3ef8f5cb996
+RZ1-5TB-4X/ix-applications/k3s/kubelet                                        960G  3.0M  960G   1% /var/lib/kubelet
+tmpfs                                                                         400M   12K  400M   1% /var/lib/kubelet/pods/9a7a5c38-1142-46cf-8960-b9f0dc9767dd/volumes/kubernetes.io~projected/kube-api-access-5rdmb
+tmpfs                                                                         500M   12K  500M   1% /var/lib/kubelet/pods/64ec460f-087d-4148-9492-064b71963521/volumes/kubernetes.io~projected/kube-api-access-g7f9s
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/0c2e55a4075797b37e1a878d1c7d39b6fe4673cc7b11e6e96cd70d905c746f2c/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/48ff84cf69cfbf7487e8b35c1ecda0474b324b973f38fbc49480038e0275436a/shm
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/48ff84cf69cfbf7487e8b35c1ecda0474b324b973f38fbc49480038e0275436a/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/0c2e55a4075797b37e1a878d1c7d39b6fe4673cc7b11e6e96cd70d905c746f2c/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/f8f5066afc6378d26c5179e670b11682ce80063bf749e583385073a46b228920/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/c037580da6e3d3bc9a27d8a8a2a496195fb51b8eaec612c55286833c9c498c9c/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/162355de15485d2fe596f7aed6cf60d04919619e9c80bbbde6cd4b22ad8824ad/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/09a1e3d9fcdfb8b36eaa2d39f0c10b86f6f981fc839adbb0c15f7c780f048e0b/rootfs
+tmpfs                                                                          32G   12K   32G   1% /var/lib/kubelet/pods/ad6c2ebd-6ddb-4aa9-a97c-07a5ee15cfce/volumes/kubernetes.io~projected/kube-api-access-j6vd2
+tmpfs                                                                          32G   12K   32G   1% /var/lib/kubelet/pods/cb65486e-9f26-41fb-9cc0-0b915b97b65e/volumes/kubernetes.io~projected/kube-api-access-gz9q8
+tmpfs                                                                         170M   12K  170M   1% /var/lib/kubelet/pods/8b705893-2d84-463c-885a-71cec9232c35/volumes/kubernetes.io~projected/kube-api-access-78s52
+tmpfs                                                                         600M   12K  600M   1% /var/lib/kubelet/pods/8b400235-c930-4ca4-b408-52f9769824f8/volumes/kubernetes.io~projected/kube-api-access-5dr5t
+tmpfs                                                                         300M   12K  300M   1% /var/lib/kubelet/pods/94ff0579-a658-46ef-a67f-74ac3d351a41/volumes/kubernetes.io~projected/kube-api-access-w8f2r
+tmpfs                                                                         300M   12K  300M   1% /var/lib/kubelet/pods/27132618-98de-479f-b06c-f3683bb1ca1d/volumes/kubernetes.io~projected/kube-api-access-wxhfz
+tmpfs                                                                          32G   12K   32G   1% /var/lib/kubelet/pods/96b765eb-4df2-4afc-b8e3-43b9335989bd/volumes/kubernetes.io~projected/kube-api-access-ktstd
+tmpfs                                                                         900M   12K  900M   1% /var/lib/kubelet/pods/6838a6a9-ee05-4998-913e-db0017681f86/volumes/kubernetes.io~projected/kube-api-access-ldbq9
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/68a047f434014f1b48c3a8403c3f87f99fc9e88008359861c7892a52798e19c6/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/cb7061128debe7570fb06b6ae7ae3b34e44baea43a32ee04db215733ad64cd39/rootfs
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/9130b337fa49a45c0bf7e3a29a4ef574a51a6717debd03c10fff7156fe42bb7d/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/c9bd81df63a3ecb6b4268e0e5dd59fc241832b78e40a7b8cdc400eadccd564bd/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/c59c7d3c860944cde0fee2ddfd3c4a52344a0ba3d5e3dc2afd6e1af47489134f/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/1763519feb8437078ca3a0914549f339e46fc7a6b1e9f82795c4854cce56aa20/shm
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/1763519feb8437078ca3a0914549f339e46fc7a6b1e9f82795c4854cce56aa20/rootfs
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/e80402daabb26550f994a80b281292f01969364683f863a7aadb1a34281dfe30/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/ca28a06c6732be51d2827c7fd8eedb9321e167f0181af1cee52b4d6e7f397173/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/b103726d7cdc3834e818c4bbbc43bc668b793fa3908c28cd9babaf12f46b3ed4/shm
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/9c757d691297445b9e84dd7cc9bd851ba35612d5e5d4fb90e1237917902560b4/shm
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9c757d691297445b9e84dd7cc9bd851ba35612d5e5d4fb90e1237917902560b4/rootfs
+shm                                                                            64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/9d04dc7684ac2917aae599732782c43c269f6604f454879b2e287bed36baa6ee/shm
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9d04dc7684ac2917aae599732782c43c269f6604f454879b2e287bed36baa6ee/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/e80402daabb26550f994a80b281292f01969364683f863a7aadb1a34281dfe30/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/b103726d7cdc3834e818c4bbbc43bc668b793fa3908c28cd9babaf12f46b3ed4/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/c9bd81df63a3ecb6b4268e0e5dd59fc241832b78e40a7b8cdc400eadccd564bd/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9130b337fa49a45c0bf7e3a29a4ef574a51a6717debd03c10fff7156fe42bb7d/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/ca28a06c6732be51d2827c7fd8eedb9321e167f0181af1cee52b4d6e7f397173/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/c59c7d3c860944cde0fee2ddfd3c4a52344a0ba3d5e3dc2afd6e1af47489134f/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/e169c150c2eb8ddfd8b4475d7d7abbaf04ccbcd23d74616961faab3c579c6f7e/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/0da92ea14d894cfb3498272dfc690ba71a3c2a1581e9336e942447cf0549d8ac/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/0e27b58d7194058f2accc1a35697931f10b138ec7151cad4a9608361354aae25/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/a6de128fdac68cd3f6a7b4497c9654786be8216345bb1c1feb259aacc04d405a/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/e46ab34efebc2bae6d5beb0c66044aff3a04eb14f7ccedc2683b08af15a51023/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/173f54ca578d2c38ee6332dd80c9b9783504c502d2ca0bbe6972989e1769e1db/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/ca61aed51437844314d369b904be77e36912e0e3b78471599ccc5872ba882a5a/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/5695b827dab653f2578195cc4084b64a13240a7d39fe337a382aa602d916428f/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/51b256c7e5207d24a30420307d4aa732aa1b5eddfb12cb73a8cbc56ea6150008/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/756aa4f2cc74025370fadffd87c362535d5f4be346c6f7a6a46a1106fad4e690/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/762ed557e84cd26a0a5bc463445bed43cb01c53785a21ca9f75082fd03ec8c74/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/d95f2f9bc307e7c5164699d3b58b6b7dfdce84b78781e9609b58f9f5985b239c/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/cfb8ac148e36b40bfc228ad981e5ab324efb543c56bae6d89e42ea6eaf7b38e0/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/a4bea6ee669b30ccba71b32e0a19248e7db5a3dcf3b93d26c659c3f64d73a059/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/6416b6bb09ab5bc447c8a31f2a4eabf88d90e324fcfd8243b526b762a00c5465/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/2d8ea84441e172354f0955774e2a670227195baf85bfba16e091f172afe251b6/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/1130c051514e20adf2172aefc403f7e002ff1ab48d5102de51b0715b648e1add/rootfs
+overlay                                                                       967G  7.1G  960G   1% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/da95d07be98e398557b342ddbe5ef2aeb26c2fdbcdcebe9d383fa1ae9805157e/rootfs
+tmpfs                                                                         3.2G     0  3.2G   0% /run/user/0
+```
+
+---
+
+## How to refresh this page
+
+From the MCP VM shell:
+
+```bash
+cd /home/furycom/mcp-manual
+./manual-refresh.sh
+```
+
+<!-- END FILE: services/truenas-status.md -->
+
+<!-- BEGIN FILE: stacks/admin-portal.md -->
+
+# Admin portal stack (generated)
+
+This page is automatically generated from `/home/furycom/admin-portal/docker-compose.yml`.
+
+It describes the Docker services that make up the admin portal stack on the `mcp-gateway` virtual machine.
+
+## Location
+
+- VM: `mcp-gateway` (Proxmox VM 103)
+- Base directory: `/home/furycom/admin-portal`
+
+## Docker services
+
+### Service `dashy`
+
+- **Image:** `lissy93/dashy`
+- **Ports:**
+- `9090:8080`
+- **Volumes:**
+  - `./dashy-config.yml:/app/user-data/conf.yml`
+
+### Service `netdata`
+
+- **Image:** `netdata/netdata`
+- **Ports:**
+- `19999:19999`
+- **Volumes:**
+  - `netdatalib:/var/lib/netdata`
+  - `netdatacache:/var/cache/netdata`
+  - `netdataconfig:/etc/netdata`
+
+### Service `portainer`
+
+- **Image:** `portainer/portainer-ce:latest`
+- **Ports:**
+- `9443:9443`
+- **Volumes:**
+  - `portainer_data:/data`
+  - `/var/run/docker.sock:/var/run/docker.sock`
+
+## Typical operations
+
+To start or stop the admin portal stack from the MCP VM:
+
+```bash
+cd /home/furycom/admin-portal
+docker compose up -d
+docker compose down
+```
+
+<!-- END FILE: stacks/admin-portal.md -->
+
+<!-- BEGIN FILE: stacks/mcp-stack.md -->
+
+# MCP stack (generated)
+
+This page is automatically generated from `/home/furycom/mcp-stack/docker-compose.yml`.
+
+It describes the Docker services that make up the MCP stack on the `mcp-gateway` virtual machine.
+
+## Location
+
+- VM: `mcp-gateway` (Proxmox VM 103)
+- Base directory: `/home/furycom/mcp-stack`
+
+## Docker services
+
+### Service `code-server`
+
+- **Image:** `lscr.io/linuxserver/code-server:latest`
+- **Ports:**
+- `8080:8443`
+- **Volumes:**
+  - `./config:/config`
+  - `.:/config/workspace`
+- **Environment:**
+- `PUID=1000`
+- `PGID=1000`
+- `TZ=America/Toronto`
+- `PASSWORD=mcpServer2024!`
+- `SUDO_PASSWORD=mcpServer2024!`
+
+### Service `mcp-gateway`
+
+- **Build context:** `./mcp-gateway`
+- **Ports:**
+- `4000:4000`
+- **Volumes:**
+  - `/home/furycom/mcp-stack:/workspace`
+  - `/home/furycom/mcp-manual/docs:/manual-docs:ro`
+- **Environment:**
+- `PORT=4000`
+- `SUPABASE_URL=http://192.168.2.206:3000`
+- `SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UtZGVtbyIsImlhdCI6MTc1NzI0Nzk1NywiZXhwIjoyMDUxMjIyNDAwfQ.okaukUEhOB6HPD5WQhvaohell-kDivrvbALzaXMVH2s`
+- `MANUAL_ROOT=/manual-docs`
+
+### Service `mcp-shell`
+
+- **Image:** `tsl0922/ttyd:latest`
+- **Ports:**
+- `7681:7681`
+- **Volumes:**
+  - `/home/furycom/mcp-stack:/workspace`
+- **Command:** `/usr/bin/ttyd -p 7681 -W -t fontSize=16 -t theme=material bash`
+
+## Typical operations
+
+To start or stop the MCP stack from the MCP VM:
+
+```bash
+cd /home/furycom/mcp-stack
+docker compose up -d
+docker compose down
+```
+
+<!-- END FILE: stacks/mcp-stack.md -->
+
+<!-- BEGIN FILE: vms/homeassistant-vm.md -->
+
+# Home Assistant VM (ID 102)
+
+This page describes the Home Assistant virtual machine running on the Proxmox host.
+
+## Role
+
+- Central home automation hub for the homelab and the house
+- Integrates multiple subsystems such as:
+  - Zigbee / Hubitat
+  - Cameras (e.g. Reolink, via Frigate in the future)
+  - Various smart devices and automations
+
+## Typical responsibilities
+
+- Run Home Assistant Core and its integrations
+- Orchestrate automations based on sensors, time and events
+- Provide dashboards for monitoring the house
+
+## Notes
+
+- Runs on Proxmox as VM ID `102`
+- May host Node-RED as an add-on or external integration.
+
+<!-- END FILE: vms/homeassistant-vm.md -->
+
+<!-- BEGIN FILE: vms/mcp-gateway-vm.md -->
+
+# MCP Gateway VM (ID 103)
+
+This page describes the MCP Gateway virtual machine running on the Proxmox host.
+
+## Role
+
+- Main VM for MCP-related services, including:
+  - MCP stack (gateway, code-server, web shell)
+  - Admin portal (Dashy, Netdata, Portainer)
+  - Documentation stack (MkDocs manual)
+
+## Typical responsibilities
+
+- Act as the central "brain" node for the MCP ecosystem
+- Provide HTTP APIs and UIs for:
+  - MCP Gateway (`/admin`, `/tools`, etc.)
+  - Web-based development (code-server)
+  - Web shell (ttyd)
+  - MCP Control Center (Dashy)
+  - Docker management (Portainer)
+  - Monitoring (Netdata)
+  - Documentation (MkDocs)
+
+## Notes
+
+- Runs on Proxmox as VM ID `103`
+- Hosts multiple Docker stacks that are documented in the "Stacks" section.
+
+<!-- END FILE: vms/mcp-gateway-vm.md -->
+
+<!-- BEGIN FILE: vms/n8n-vm.md -->
+
+# n8n VM (ID 111)
+
+This page describes the n8n virtual machine running on the Proxmox host.
+
+## Role
+
+- Dedicated automation engine based on n8n
+- Connects multiple services in the homelab:
+  - Supabase
+  - MCP Gateway
+  - OpenWebUI / Ollama
+  - Notification channels (e.g. ntfy, email, etc.)
+
+## Typical responsibilities
+
+- Run workflows triggered by:
+  - HTTP webhooks
+  - Timers / schedules
+  - Events from other systems
+- Implement complex automations without hard-coding everything in scripts.
+
+## Access
+
+- Runs on Proxmox as VM ID `111`
+- Web UI: `http://192.168.2.231:5678`
+
+<!-- END FILE: vms/n8n-vm.md -->
+
+<!-- BEGIN FILE: vms/proxmox-vms.md -->
+
+# Proxmox virtual machines
+
+This page lists the main virtual machines running on the Proxmox box and their roles.
+
+## VM 100 – `supabase-vm`
+
+- Role: primary Supabase instance (database + REST API) for the MCP ecosystem
+- Typical responsibilities:
+  - Store structured data and long-term memory
+  - Expose REST RPC endpoints (e.g. `exec_sql`) used by MCP Gateway
+
+## VM 101 – `rotki`
+
+- Role: Rotki or other finance/accounting tools (exact usage to be detailed)
+- Notes:
+  - Runs as its own VM to isolate resource usage and data
+
+## VM 102 – `homeassistant`
+
+- Role: Home Assistant and related home automation tools
+- Typical responsibilities:
+  - Zigbee / Hubitat integrations
+  - Home automations and dashboards
+
+## VM 103 – `mcp-gateway`
+
+- Role: core MCP VM
+- Main stacks:
+  - `~/mcp-stack`:
+    - MCP Gateway (Node/Express server)
+    - Code-Server (web-based VS Code)
+    - MCP shell (ttyd web terminal)
+  - `~/admin-portal`:
+    - Dashy (MCP Control Center portal)
+    - Netdata (monitoring for this VM)
+    - Portainer (Docker management UI)
+
+## VM 111 – `n8n-vm`
+
+- Role: n8n automations
+- Typical responsibilities:
+  - Orchestrate workflows between Supabase, MCP Gateway, OpenWebUI, ntfy and other services
+
+<!-- END FILE: vms/proxmox-vms.md -->
+
+<!-- BEGIN FILE: vms/rotki-vm.md -->
+
+# Rotki VM (ID 101)
+
+This page describes the Rotki (or finance-related) virtual machine running on the Proxmox host.
+
+## Role
+
+- Dedicated virtual machine for Rotki or similar finance / portfolio tools
+- Keeps financial and accounting workloads isolated from other services
+
+## Typical responsibilities
+
+- Track crypto and financial positions (depending on configuration)
+- Run background tasks or cron jobs related to finance
+- Store sensitive financial data separately from the main MCP services
+
+## Notes
+
+- Runs on Proxmox as VM ID `101`
+- Detailed configuration can be documented here as the setup evolves.
+
+<!-- END FILE: vms/rotki-vm.md -->
+
+<!-- BEGIN FILE: vms/supabase-vm.md -->
+
+# Supabase VM (ID 100)
+
+This page describes the Supabase virtual machine running on the Proxmox host.
+
+## Role
+
+- Primary Supabase instance for the homelab MCP ecosystem
+- Provides:
+  - PostgreSQL database
+  - REST and RPC endpoints
+  - Authentication and storage (if configured)
+
+## Typical responsibilities
+
+- Store structured data, logs and long-term memory
+- Expose RPC functions (e.g. `exec_sql`) used by MCP Gateway
+- Act as a central data hub for:
+  - MCP tools
+  - n8n automations
+  - Other services that need a shared database
+
+## Access
+
+- Runs on Proxmox as VM ID `100`
+- REST endpoint (via PostgREST): `http://192.168.2.206:3000` (internal)
+- Supabase Studio / web UI: `http://192.168.2.206:8000/project/default`
+
+<!-- END FILE: vms/supabase-vm.md -->
+
