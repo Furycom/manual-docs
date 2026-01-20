@@ -1,4 +1,4 @@
-# DOC CANONICAL GOVERNANCE — V3
+# DOC CANONICAL GOVERNANCE — V4
 Date (UTC): 2026-01-20
 But: Tout ce qui guide BRUCE vit DANS le Home Lab, est versionné, et reste retrouvable + embeddable (RAG).
 
