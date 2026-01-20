@@ -19,3 +19,4 @@
 *.key
 *.pem
 *.token
+operations/_snapshots/

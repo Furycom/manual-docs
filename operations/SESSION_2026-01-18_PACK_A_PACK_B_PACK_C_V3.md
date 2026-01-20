@@ -1,34 +1,10 @@
 # Session BRUCE — 2026-01-18 — Pack A + Pack B (préparation Pack C)
 
-## PACK D — Doc canonique + knowledge + scope embeddable (2026-01-19)
-
-- Repo docs versionné localement: /home/furycom/manual-docs (main)
-- Canonique (8 fichiers) en place: /home/furycom/manual-docs/operations (CANONICAL_SET_LATEST.md)
-- Schéma LATEST opérationnel: *_LATEST.md -> *_V*.md (sauf SESSION_LATEST.md)
-- Knowledge importée et versionnée: /home/furycom/manual-docs/knowledge (sources embeddables)
-- Index embeddable (scope + exclusions + pointeurs): INDEX_EMBEDDABLE_LATEST.md
-
----
-
-
 ## Contexte opérationnel
 
 * Hôte : `furymcp` (LAN)
 * MCP Gateway : `http://192.168.2.230:4000` (port `4000`)
-* Token : `BRUCE_AUTH_TOKEN` (dans conteneur mcp-gateway) — utiliser le snippet AUTH canonique
-
-### Snippet AUTH (canon, sans placeholders)
-
-```bash
-BRUCE_TOKEN="$(docker exec mcp-gateway sh -lc 'printf %s "$BRUCE_AUTH_TOKEN"' 2>/dev/null || true)"
-test -n "$BRUCE_TOKEN"
-```
-
-Exemples (curl depuis l’host):
-
-```bash
-curl -fsS --connect-timeout 2 --max-time 10 -H "Authorization: Bearer $BRUCE_TOKEN" http://127.0.0.1:4000/bruce/rag/metrics | head -n 60
-```
+* Token : `BRUCE_AUTH_TOKEN (dans conteneur mcp-gateway) — extraction dynamique`
 * Contrainte critique de session :
 
   * Ne **jamais** arrêter/éteindre le conteneur **Termix** (outil d’accès principal à la CLI).
