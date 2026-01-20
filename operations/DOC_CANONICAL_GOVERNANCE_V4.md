@@ -69,3 +69,17 @@ Procédure quand une contradiction est détectée (ex: “Créer observed_snapsh
 2) Ajouter/mettre à jour l’extrait dans `knowledge/visions/LATEST_CONTRADICTIONS.md`.
 3) Si la résolution doit devenir canonique: réécrire la règle dans `operations/` (ERRATUM / checklist / handoff / doc canonique) et versionner.
 
+
+## Infra (état réel) — pointeurs LATEST
+
+But: disposer d’un état “réel” consultable (inventaire/structure) sans confondre avec les visions.
+
+Règle:
+- L’infra “la plus à jour” se lit via `knowledge/infra/LATEST.md`.
+
+Pointeurs:
+- `knowledge/infra/LATEST.md` (snapshot “Full” infra le plus récent)
+- `knowledge/infra/LATEST.txt` (nom du snapshot de référence)
+- `knowledge/infra/exports/` (historiques figés datés)
+- `knowledge/infra/exports/INFRA_PATCH_*.md` (patchs/deltas courts)
+

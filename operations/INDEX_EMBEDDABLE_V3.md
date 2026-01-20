@@ -52,7 +52,7 @@ Dossier: `/home/furycom/manual-docs/knowledge`
 ## Pointeurs LATEST — knowledge (infra)
 Dossier: `/home/furycom/manual-docs/knowledge/infra`
 
-- `knowledge/infra/LATEST.md` (delta infra le plus récent)
+- `knowledge/infra/LATEST.md` (snapshot “Full” infra le plus récent)
 - `knowledge/infra/exports/` (historiques infra)
 
 ## Pointeurs LATEST — visions (blueprints / architecture)
