@@ -1,1 +1,1 @@
-exports/INFRA_PATCH_2026-01-19.md
+exports/Bruce_Homelab_Infrastructure_Full_2026-01-19.md
