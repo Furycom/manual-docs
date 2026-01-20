@@ -17,6 +17,7 @@ But: Point d’entrée unique pour retrouver la doc canonique + le scope embedda
 12) CHECKLIST_LATEST.md
 
 ## Knowledge — Pointeurs utiles (knowledge/)
+- infra:           knowledge/infra/LATEST.md + LATEST.txt
 - mcp-manual:      knowledge/mcp-manual/LATEST.md + LATEST.txt
 - mcp-stack-docs:  knowledge/mcp-stack-docs/LATEST.md
 - sessions:        knowledge/sessions/LATEST.md
