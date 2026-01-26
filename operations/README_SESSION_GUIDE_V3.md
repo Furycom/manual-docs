@@ -148,3 +148,11 @@ git commit -m "docs: README_SESSION_GUIDE V3 (RAG payload q)"
 echo
 echo "=== status (bounded) ==="
 git status --porcelain=v1 | sed -n '1,80p'
+
+## Fin de session — commande unique (canon)
+
+Sur `furymcp` :
+1) `tools/bruce_close_session.sh`
+2) Vérifier (borné) :
+   - `sed -n '1,120p' operations/NEXT_SESSION_HANDOFF_LATEST.md`
+   - `git log -1 --oneline`
