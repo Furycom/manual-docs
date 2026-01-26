@@ -4,6 +4,7 @@
 # Goals: fast, no recursion, timeouts per request, never print token.
 # Note: intentionally NO 'set -euo pipefail'.
 
+# --- guard against recursion / runaway shells ---
 if [ "${BRUCE_CLOSE_SESSION_RUNNING:-0}" = "1" ]; then
   echo "[ERROR] bruce_close_session: recursion detected (BRUCE_CLOSE_SESSION_RUNNING=1). Aborting."
   exit 2
@@ -21,13 +22,13 @@ fi
 
 REPO="/home/furycom/manual-docs"
 OPS="${REPO}/operations"
-TMP_DIR="${REPO}/.run_tmp"
 
 BASE="http://192.168.2.230:4000"
-MAX_TIME="6"
+MAX_TIME="6"  # per curl request
 
-mkdir -p "$TMP_DIR" 2>/dev/null || true
-chmod 700 "$TMP_DIR" 2>/dev/null || true
+RUN_TMP="${REPO}/.run_tmp"
+mkdir -p "$RUN_TMP" 2>/dev/null || true
+chmod 700 "$RUN_TMP" 2>/dev/null || true
 
 now_utc="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 day_utc="$(date -u +"%Y-%m-%d")"
@@ -37,37 +38,40 @@ branch="$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknow
 head_before="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 
 pid="$$"
-F_HEALTH="${TMP_DIR}/mcp_health_${pid}.json"
-F_METRICS="${TMP_DIR}/mcp_metrics_${pid}.json"
-F_LASTSEEN="${TMP_DIR}/mcp_last_seen_${pid}.json"
-F_DOCKERSUM="${TMP_DIR}/mcp_docker_sum_${pid}.json"
-F_ISSUES="${TMP_DIR}/mcp_issues_${pid}.json"
+F_HEALTH="${RUN_TMP}/mcp_health_${pid}.json"
+F_METRICS="${RUN_TMP}/mcp_metrics_${pid}.json"
+F_LASTSEEN="${RUN_TMP}/mcp_last_seen_${pid}.json"
+F_DOCKERSUM="${RUN_TMP}/mcp_docker_sum_${pid}.json"
+F_ISSUES="${RUN_TMP}/mcp_issues_${pid}.json"
 
+# --- token (safe, no print) ---
 TOKEN="$(docker exec mcp-gateway sh -lc 'printf %s "$BRUCE_AUTH_TOKEN"' 2>/dev/null | tr -d '\r\n')"
 
 curl_to_file() {
+  # $1=url $2=outfile $3=header(optional)
   local url="$1"
   local out="$2"
   local hdr="$3"
 
-  : > "$out" 2>/dev/null || return 0
+  : > "$out" 2>/dev/null
   if [ -n "$hdr" ]; then
-    curl -sS --max-time "$MAX_TIME" -H "$hdr" -o "$out" "$url" 2>/dev/null || true
+    curl -sS --max-time "$MAX_TIME" -H "$hdr" -o "$out" "$url" 2>/dev/null
   else
-    curl -sS --max-time "$MAX_TIME" -o "$out" "$url" 2>/dev/null || true
+    curl -sS --max-time "$MAX_TIME" -o "$out" "$url" 2>/dev/null
   fi
 
-  tr -d '\r' < "$out" > "${out}.tmp" 2>/dev/null || true
-  mv -f "${out}.tmp" "$out" 2>/dev/null || true
+  tr -d '\r' < "$out" > "${out}.tmp" 2>/dev/null
+  mv -f "${out}.tmp" "$out" 2>/dev/null
 }
 
 curl_dbg() {
+  # $1=url $2=header(optional)
   local url="$1"
   local hdr="$2"
   if [ -n "$hdr" ]; then
-    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "$hdr" "$url" 2>/dev/null || true
+    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "$hdr" "$url" 2>/dev/null
   else
-    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" "$url" 2>/dev/null || true
+    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" "$url" 2>/dev/null
   fi
 }
 
@@ -84,81 +88,98 @@ run_all() {
   last_seen_dbg="$(curl_dbg "${BASE}/bruce/introspect/last-seen" "X-BRUCE-TOKEN: ${TOKEN}")"
   docker_sum_dbg="$(curl_dbg "${BASE}/bruce/introspect/docker/summary" "X-BRUCE-TOKEN: ${TOKEN}")"
 
+  # --- BRUCE-only parse: only docker domain ---
   issues_counts_and_nextstep="$(
-    python3 - "$F_ISSUES" <<'PY' 2>/dev/null
-import json, pathlib, sys
-
-p = pathlib.Path(sys.argv[1])
+    python3 - <<'PY' 2>/dev/null
+import json, pathlib
+p = pathlib.Path("'"$F_ISSUES"'")
 raw = p.read_text(errors="ignore").strip() if p.exists() else ""
 if not raw:
     print("counts: unavailable (empty response)")
-    print("NEXTSTEP: BRUCE-only: inspect docker issues (no data)")
+    print("NEXTSTEP: BRUCE-only: inspect docker expected/observed (no issues payload)")
     raise SystemExit(0)
-
 try:
     obj = json.loads(raw)
 except Exception:
     print("counts: unavailable (invalid json)")
-    print("NEXTSTEP: BRUCE-only: inspect docker issues (invalid json)")
+    print("NEXTSTEP: BRUCE-only: inspect docker expected/observed (invalid issues json)")
     raise SystemExit(0)
 
 data = obj.get("data") if isinstance(obj, dict) else None
 if not isinstance(data, list):
     print("counts: unavailable (no data array)")
-    print("NEXTSTEP: BRUCE-only: inspect docker issues (no data array)")
+    print("NEXTSTEP: BRUCE-only: inspect docker expected/observed (no data array)")
     raise SystemExit(0)
+
+docker_items = [it for it in data if (it.get("domain") or "").lower() == "docker"]
 
 crit = 0
 warn = 0
-docker_crit_lines = []
+crit_lines = []
 
-for it in data:
+for it in docker_items:
     sev = (it.get("severity") or "").lower()
+    t = it.get("type")
     if sev == "critical":
         crit += 1
+        if t == "SERVICE_MISSING":
+            h = it.get("scope1")
+            c = it.get("scope2")
+            crit_lines.append(f"- CRITICAL SERVICE_MISSING: host={h} container={c}")
+        else:
+            msg = (it.get("message") or "")[:140]
+            crit_lines.append(f"- CRITICAL {t}: {msg}")
     elif sev == "warning":
         warn += 1
 
-    if (it.get("domain") or "").lower() != "docker":
-        continue
-    if sev != "critical":
-        continue
-
-    t = it.get("type")
-    if t == "SERVICE_MISSING":
-        h = it.get("scope1")
-        c = it.get("scope2")
-        docker_crit_lines.append(f"- CRITICAL SERVICE_MISSING: host={h} container={c}")
-    else:
-        msg = (it.get("message") or "")[:140]
-        docker_crit_lines.append(f"- CRITICAL {t}: {msg}")
-
 print(f"counts: critical={crit} warning={warn}")
-if docker_crit_lines:
+if crit_lines:
     print("critical_list_bruce_only:")
-    for line in docker_crit_lines[:10]:
+    for line in crit_lines[:10]:
         print(line)
-    first = docker_crit_lines[0]
-    host = first.split("host=",1)[1].split()[0].strip() if "host=" in first else None
-    cont = first.split("container=",1)[1].split()[0].strip() if "container=" in first else None
-    if host and cont:
-        print(f"NEXTSTEP: BRUCE-only: fix SERVICE_MISSING on {host} (expected container {cont})")
+
+if crit_lines:
+    # first SERVICE_MISSING if present
+    sm = next((l for l in crit_lines if "SERVICE_MISSING" in l), None)
+    if sm:
+        # extract host/container from line
+        parts = sm.replace("- CRITICAL SERVICE_MISSING: ", "").strip()
+        print(f"NEXTSTEP: BRUCE-only: fix SERVICE_MISSING ({parts})")
     else:
-        print("NEXTSTEP: BRUCE-only: fix critical docker issue (see list above)")
+        print("NEXTSTEP: BRUCE-only: resolve critical docker issue(s)")
 else:
-    print("NEXTSTEP: BRUCE-only: no critical docker issues found (defer non-BRUCE domains)")
+    print("NEXTSTEP: BRUCE-only: MCP-first; no critical docker issue detected")
 PY
   )"
 
-  if [ -z "$issues_counts_and_nextstep" ]; then
-    issues_counts_and_nextstep="counts: unavailable (parser produced empty output)
-NEXTSTEP: BRUCE-only: inspect docker expected/observed (parser empty)"
-  fi
+  issues_preview="$(
+    python3 - <<'PY' 2>/dev/null
+import json, pathlib
+p = pathlib.Path("'"$F_ISSUES"'")
+raw = p.read_text(errors="ignore").strip() if p.exists() else ""
+if not raw:
+    print("{}")
+    raise SystemExit(0)
+try:
+    obj = json.loads(raw)
+except Exception:
+    print("{}")
+    raise SystemExit(0)
 
-  nextstep="$(printf '%s\n' "$issues_counts_and_nextstep" | awk -F'NEXTSTEP: ' '/^NEXTSTEP: /{print $2; exit}')"
+data = obj.get("data") if isinstance(obj, dict) else None
+if not isinstance(data, list):
+    print("{}")
+    raise SystemExit(0)
+
+docker_items = [it for it in data if (it.get("domain") or "").lower() == "docker"]
+out = {"ok": obj.get("ok", True), "status": obj.get("status", 200), "data": docker_items}
+s = json.dumps(out, separators=(",",":"))
+print(s[:600])
+PY
+  )"
+
+  nextstep="$(printf '%s\n' "$issues_counts_and_nextstep" | grep -E '^NEXTSTEP:' | head -n 1 | sed 's/^NEXTSTEP:[ ]*//')"
   [ -n "$nextstep" ] || nextstep="BRUCE-only: inspect docker expected/observed (no NEXTSTEP parsed)"
-
-  issues_preview="$(tr -d '\r' < "$F_ISSUES" | head -c 600)"
 
   out_md="${OPS}/NEXT_SESSION_HANDOFF_V${day_utc}_${stamp_utc}_AUTO.md"
   latest_link="${OPS}/NEXT_SESSION_HANDOFF_LATEST.md"
@@ -174,7 +195,7 @@ NEXTSTEP: BRUCE-only: inspect docker expected/observed (parser empty)"
     echo "## Objectif (prochaine session)"
     echo "- Démarrer MCP-first (état observé -> choisir UNE action suivante)."
     echo "- Se concentrer uniquement sur BRUCE (docker expected/observed + collectors + MCP health)."
-    echo "- Ne pas traiter TrueNAS dans cette session (deferred)."
+    echo "- Ignorer les issues hors BRUCE pour cette session."
     echo
     echo "## MCP (collecte)"
     echo "Base: ${BASE}"
@@ -191,9 +212,9 @@ NEXTSTEP: BRUCE-only: inspect docker expected/observed (parser empty)"
     echo
     echo
     echo "### Issues ouvertes (resume)"
-    printf '%s\n' "$issues_counts_and_nextstep" | sed -n '1,160p'
+    printf '%s\n' "$issues_counts_and_nextstep" | sed -n '1,80p'
     echo
-    echo "### Issues preview (borne, 600 chars)"
+    echo "### Issues preview (BRUCE-only, 600 chars)"
     echo "${issues_preview}"
     echo
     echo "## Meilleure prochaine etape (heuristique)"
@@ -207,8 +228,8 @@ NEXTSTEP: BRUCE-only: inspect docker expected/observed (parser empty)"
 
   ln -sfn "$(basename "$out_md")" "$latest_link" 2>/dev/null || true
 
-  git -C "$REPO" add tools/bruce_close_session.sh "$out_md" "$latest_link" 2>/dev/null || true
-  git -C "$REPO" commit -m "tools: write temp files in repo + BRUCE-only nextstep" >/dev/null 2>&1 || true
+  git -C "$REPO" add "$out_md" "$latest_link" 2>/dev/null || true
+  git -C "$REPO" commit -m "ops: close session ${day_utc} (AUTO)" >/dev/null 2>&1 || true
 
   head_after="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 
