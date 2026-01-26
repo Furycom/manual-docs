@@ -18,7 +18,6 @@ critical_list:
 
 ## Meilleure prochaine action
 Priorité BRUCE-only: corriger `SERVICE_MISSING` sur `furycomai` (container `youthful_pike`). TrueNAS: deferred.
-Priorite: TrueNAS pool RZ1-5TB-4X DEGRADED (FAILING_DEV) -> diagnostiquer disque / resilver / SMART (sur TrueNAS).
 
 ## Notes (bornes)
 - last-seen, docker summary, rag metrics collectes dans /tmp (mcp_last_seen.json, mcp_docker_sum.json, mcp_metrics.json).

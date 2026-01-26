@@ -25,8 +25,8 @@ REPO="/home/furycom/manual-docs"
 OPS="${REPO}/operations"
 
 BASE="http://192.168.2.230:4000"
-MAX_TIME="6"        # per curl
-OVERALL_TIMEOUT="60" # whole run
+MAX_TIME="6"          # per curl
+OVERALL_TIMEOUT="60"  # whole run
 
 now_utc="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 day_utc="$(date -u +"%Y-%m-%d")"
@@ -43,129 +43,183 @@ F_LASTSEEN="/tmp/mcp_last_seen_${pid}.json"
 F_DOCKERSUM="/tmp/mcp_docker_sum_${pid}.json"
 F_ISSUES="/tmp/mcp_issues_${pid}.json"
 
-cleanup() {
-  rm -f "$F_HEALTH" "$F_METRICS" "$F_LASTSEEN" "$F_DOCKERSUM" "$F_ISSUES" 2>/dev/null || true
-  unset BRUCE_CLOSE_SESSION_RUNNING
-}
-trap cleanup EXIT
-
-# token (never print)
+# --- token (safe, no print) ---
 TOKEN="$(docker exec mcp-gateway sh -lc 'printf %s "$BRUCE_AUTH_TOKEN"' 2>/dev/null | tr -d '\r\n')"
 
 curl_to_file() {
   # $1=url $2=outfile $3=header(optional)
   local url="$1"
   local out="$2"
-  local hdr="${3:-}"
+  local hdr="$3"
 
-  : > "$out" 2>/dev/null || true
-
+  : > "$out" 2>/dev/null
   if [ -n "$hdr" ]; then
-    curl -sS --max-time "$MAX_TIME" -H "$hdr" -o "$out" "$url" 2>/dev/null || true
+    curl -sS --max-time "$MAX_TIME" -H "$hdr" -o "$out" "$url" 2>/dev/null
   else
-    curl -sS --max-time "$MAX_TIME" -o "$out" "$url" 2>/dev/null || true
+    curl -sS --max-time "$MAX_TIME" -o "$out" "$url" 2>/dev/null
   fi
 
-  # normalize CRLF -> LF (safe even if empty)
-  tr -d '\r' < "$out" > "${out}.tmp" 2>/dev/null || true
-  mv -f "${out}.tmp" "$out" 2>/dev/null || true
+  # normalize CRLF -> LF
+  tr -d '\r' < "$out" > "${out}.tmp" 2>/dev/null
+  mv -f "${out}.tmp" "$out" 2>/dev/null
 }
 
 curl_dbg() {
   # $1=url $2=header(optional)
   local url="$1"
-  local hdr="${2:-}"
+  local hdr="$2"
   if [ -n "$hdr" ]; then
-    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "$hdr" "$url" 2>/dev/null || echo "http=000 bytes=0"
+    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "$hdr" "$url" 2>/dev/null
   else
-    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" "$url" 2>/dev/null || echo "http=000 bytes=0"
+    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" "$url" 2>/dev/null
   fi
 }
 
 run_all() {
-  # Collect MCP responses
+  # --- collect MCP responses (files) ---
   curl_to_file "${BASE}/health" "$F_HEALTH" ""
   curl_to_file "${BASE}/bruce/rag/metrics" "$F_METRICS" "X-BRUCE-TOKEN: ${TOKEN}"
   curl_to_file "${BASE}/bruce/introspect/last-seen" "$F_LASTSEEN" "X-BRUCE-TOKEN: ${TOKEN}"
   curl_to_file "${BASE}/bruce/introspect/docker/summary" "$F_DOCKERSUM" "X-BRUCE-TOKEN: ${TOKEN}"
   curl_to_file "${BASE}/bruce/issues/open" "$F_ISSUES" "X-BRUCE-TOKEN: ${TOKEN}"
 
+  # --- http/bytes debug (no body) ---
   health_dbg="$(curl_dbg "${BASE}/health" "")"
   metrics_dbg="$(curl_dbg "${BASE}/bruce/rag/metrics" "X-BRUCE-TOKEN: ${TOKEN}")"
   issues_dbg="$(curl_dbg "${BASE}/bruce/issues/open" "X-BRUCE-TOKEN: ${TOKEN}")"
   last_seen_dbg="$(curl_dbg "${BASE}/bruce/introspect/last-seen" "X-BRUCE-TOKEN: ${TOKEN}")"
   docker_sum_dbg="$(curl_dbg "${BASE}/bruce/introspect/docker/summary" "X-BRUCE-TOKEN: ${TOKEN}")"
 
-  # Parse issues summary + decide next step
-  issues_summary_and_next="$(
-    python3 - <<PY 2>/dev/null
-import json, pathlib
+  # --- parse issues summary from FILE (BRUCE-only nextstep; ignore domain=truenas) ---
+  issues_counts_and_nextstep="$(
+    F_ISSUES_PATH="$F_ISSUES" python3 - <<'PY' 2>/dev/null
+import json, os, pathlib
 
-p = pathlib.Path("${F_ISSUES}")
+p = pathlib.Path(os.environ.get("F_ISSUES_PATH","/tmp/mcp_issues.json"))
 raw = p.read_text(errors="ignore").strip() if p.exists() else ""
+if not raw:
+    print("counts: unavailable (empty response)")
+    print("NEXTSTEP: BRUCE-only -> run bootstrap, then re-check /bruce/issues/open")
+    raise SystemExit(0)
+
+try:
+    obj = json.loads(raw)
+except Exception:
+    print("counts: unavailable (invalid json)")
+    print("NEXTSTEP: BRUCE-only -> run bootstrap, then re-check /bruce/issues/open")
+    raise SystemExit(0)
+
+data = obj.get("data") if isinstance(obj, dict) else None
+if not isinstance(data, list):
+    print("counts: unavailable (no data array)")
+    print("NEXTSTEP: BRUCE-only -> run bootstrap, then re-check /bruce/issues/open")
+    raise SystemExit(0)
+
 crit = 0
 warn = 0
 crit_lines = []
-has_pool_fail = False
-has_service_missing = False
+deferred_lines = []
 
-if raw:
-    try:
-        obj = json.loads(raw)
-        data = obj.get("data") if isinstance(obj, dict) else None
-        if isinstance(data, list):
-            for it in data:
-                sev = (it.get("severity") or "").lower()
-                t = it.get("type")
-                if sev == "critical":
-                    crit += 1
-                    if t == "pool_status":
-                        has_pool_fail = True
-                        payload = it.get("payload") or {}
-                        pool = payload.get("pool_name")
-                        code = payload.get("status_code")
-                        crit_lines.append(f"- CRITICAL pool_status: pool={pool} code={code}")
-                    elif t == "SERVICE_MISSING":
-                        has_service_missing = True
-                        h = it.get("scope1")
-                        c = it.get("scope2")
-                        crit_lines.append(f"- CRITICAL SERVICE_MISSING: host={h} container={c}")
-                    else:
-                        msg = (it.get("message") or "")[:140]
-                        crit_lines.append(f"- CRITICAL {t}: {msg}")
-                elif sev == "warning":
-                    warn += 1
-    except Exception:
-        raw = ""
+# choose BRUCE-only next step: first CRITICAL where domain != truenas; prefer SERVICE_MISSING/docker
+best = None
+best_rank = 10**9
 
-if not raw:
-    print("counts: unavailable (empty/invalid response)")
-    print("NEXTSTEP: rerun /home/furycom/bootstrap.sh then retry /bruce/issues/open")
-else:
-    print(f"counts: critical={crit} warning={warn}")
-    if crit_lines:
-        print("critical_list:")
-        for line in crit_lines[:10]:
-            print(line)
-    if has_pool_fail:
-        print("NEXTSTEP: priority TrueNAS pool DEGRADED (FAILING_DEV) -> diagnose disk / resilver / SMART on TrueNAS")
-    elif has_service_missing:
-        print("NEXTSTEP: docker expected/observed mismatch -> why container youthful_pike expected on furycomai but not observed")
+def rank(item):
+    # lower is better
+    t = (item.get("type") or "").upper()
+    d = (item.get("domain") or "").lower()
+    sev = (item.get("severity") or "").lower()
+    if sev != "critical":
+        return 10**8
+    if d == "truenas":
+        return 10**7
+    if t == "SERVICE_MISSING" and d == "docker":
+        return 0
+    return 1000
+
+for it in data:
+    sev = (it.get("severity") or "").lower()
+    dom = (it.get("domain") or "").lower()
+    t = it.get("type")
+
+    if sev == "critical":
+        crit += 1
+        if dom == "truenas":
+            # keep as deferred visibility
+            if t == "pool_status":
+                payload = it.get("payload") or {}
+                pool = payload.get("pool_name")
+                code = payload.get("status_code")
+                deferred_lines.append(f"- DEFERRED truenas pool_status: pool={pool} code={code}")
+            else:
+                msg = (it.get("message") or "")[:140]
+                deferred_lines.append(f"- DEFERRED truenas {t}: {msg}")
+        else:
+            if t == "pool_status":
+                payload = it.get("payload") or {}
+                pool = payload.get("pool_name")
+                code = payload.get("status_code")
+                crit_lines.append(f"- CRITICAL pool_status: pool={pool} code={code}")
+            elif (t or "").upper() == "SERVICE_MISSING":
+                h = it.get("scope1")
+                c = it.get("scope2")
+                crit_lines.append(f"- CRITICAL SERVICE_MISSING: host={h} container={c}")
+            else:
+                msg = (it.get("message") or "")[:140]
+                crit_lines.append(f"- CRITICAL {t}: {msg}")
+
+    elif sev == "warning":
+        warn += 1
+
+    r = rank(it)
+    if r < best_rank:
+        best_rank = r
+        best = it
+
+print(f"counts: critical={crit} warning={warn}")
+if crit_lines:
+    print("critical_list:")
+    for line in crit_lines[:10]:
+        print(line)
+
+if deferred_lines:
+    print("deferred_list:")
+    for line in deferred_lines[:10]:
+        print(line)
+
+# BRUCE-only nextstep
+if best and (best.get("domain") or "").lower() != "truenas":
+    t = (best.get("type") or "").upper()
+    dom = (best.get("domain") or "").lower()
+    if t == "SERVICE_MISSING" and dom == "docker":
+        h = best.get("scope1")
+        c = best.get("scope2")
+        print(f"NEXTSTEP: BRUCE-only -> fix SERVICE_MISSING (host={h}, container={c})")
     else:
-        print("NEXTSTEP: no critical -> run /home/furycom/bootstrap.sh and pick one open item")
+        msg = (best.get("message") or "")[:140]
+        print(f"NEXTSTEP: BRUCE-only -> address CRITICAL {t} ({dom}): {msg}")
+else:
+    print("NEXTSTEP: BRUCE-only -> fix docker expected/observed drift (no non-truenas critical found)")
 PY
   )"
 
-  issues_counts="$(printf '%s\n' "$issues_summary_and_next" | sed -n '1,40p')"
-  nextstep="$(printf '%s\n' "$issues_summary_and_next" | grep -E '^NEXTSTEP:' | sed -n '1p' | sed 's/^NEXTSTEP:[ ]*//')"
+  issues_preview="$(
+    F_ISSUES_PATH="$F_ISSUES" python3 - <<'PY' 2>/dev/null
+import os, pathlib, re
+p = pathlib.Path(os.environ.get("F_ISSUES_PATH","/tmp/mcp_issues.json"))
+s = p.read_text(errors="ignore") if p.exists() else ""
+s = re.sub(r'\s+', ' ', s).strip()
+print((s[:600] + ("..." if len(s) > 600 else "")) if s else "(empty)")
+PY
+  )"
 
-  # Health short (single line)
-  health_short="$(tr -d '\n' < "$F_HEALTH" | cut -c1-260)"
+  # extract NEXTSTEP line (single)
+  nextstep="$(printf '%s\n' "$issues_counts_and_nextstep" | awk -F'NEXTSTEP: ' 'NF>1{print $2; exit}')"
+  if [ -z "$nextstep" ]; then
+    nextstep="BRUCE-only -> run bootstrap then pick ONE action from issues"
+  fi
 
-  # Issues preview (bounded) - show first 600 chars
-  issues_preview="$(tr -d '\n' < "$F_ISSUES" | cut -c1-600)"
-
-  out_md="${OPS}/NEXT_SESSION_HANDOFF_V${day_utc}_${stamp_utc}.md"
+  out_md="${OPS}/NEXT_SESSION_HANDOFF_V${day_utc}_${stamp_utc}_AUTO.md"
   latest_link="${OPS}/NEXT_SESSION_HANDOFF_LATEST.md"
 
   {
@@ -177,8 +231,9 @@ PY
     echo "HEAD (before write): ${head_before}"
     echo
     echo "## Objectif (prochaine session)"
-    echo "- Demarrer MCP-first (etat observe -> choisir UNE action suivante)."
-    echo "- Assurer que les canoniques LATEST sont coherents."
+    echo "- Démarrer MCP-first (état observé -> choisir UNE action suivante)."
+    echo "- Améliorer BRUCE (objectif final -> déjà fait -> reste à faire -> impact/urgence)."
+    echo "- Scope: BRUCE uniquement (ignorer truenas dans le NEXTSTEP)."
     echo
     echo "## MCP (collecte)"
     echo "Base: ${BASE}"
@@ -191,10 +246,11 @@ PY
     echo "- docker-sum: ${docker_sum_dbg}"
     echo
     echo "Health (raw, court):"
-    echo "${health_short}"
+    tr -d '\r' < "$F_HEALTH" | head -c 450
+    echo
     echo
     echo "### Issues ouvertes (resume)"
-    printf '%s\n' "$issues_counts" | sed -n '1,60p'
+    printf '%s\n' "$issues_counts_and_nextstep" | sed -n '1,80p'
     echo
     echo "### Issues preview (borne, 600 chars)"
     echo "${issues_preview}"
@@ -208,10 +264,8 @@ PY
     echo "2) Reprendre ici avec la sortie, puis executer UNE action (selon \"Meilleure prochaine etape\")."
   } > "$out_md"
 
-  # repoint LATEST
   ln -sfn "$(basename "$out_md")" "$latest_link" 2>/dev/null || true
 
-  # git commit
   git -C "$REPO" add "$out_md" "$latest_link" 2>/dev/null || true
   git -C "$REPO" commit -m "ops: close session ${day_utc} (AUTO)" >/dev/null 2>&1 || true
 
@@ -223,4 +277,9 @@ PY
   echo "[OK] committed on ${branch} (${head_before} -> ${head_after})"
 }
 
-timeout "${OVERALL_TIMEOUT}" bash -c run_all 2>/dev/null || run_all
+# overall timeout (best-effort)
+if command -v timeout >/dev/null 2>&1; then
+  timeout "${OVERALL_TIMEOUT}" bash -c "$(declare -f run_all); run_all" 2>/dev/null || run_all
+else
+  run_all
+fi
