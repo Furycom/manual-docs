@@ -2,13 +2,13 @@
 
 ## Résumé
 - Clôture automatique de session.
-- Génération handoff: NEXT_SESSION_HANDOFF_V2026-01-26_D.md
-- Synthèse MCP (health/issues/metrics) avec fallback si endpoints non disponibles.
+- Génération handoff: NEXT_SESSION_HANDOFF_V2026-01-26_E.md
+- Collecte MCP: health/issues/metrics + debug http/bytes.
 
 ## État Git
 - Repo: /home/furycom/manual-docs
 - Branch: main
-- HEAD (before commit): 75df870
+- HEAD (before commit): aac87df
 - Working tree changes (before commit): 1
 
 ## MCP (base)
@@ -16,4 +16,4 @@
 
 ## Pointeurs LATEST (après clôture)
 - README_SESSION_GUIDE_LATEST -> /home/furycom/manual-docs/operations/README_SESSION_GUIDE_V3.md
-- NEXT_SESSION_HANDOFF_LATEST -> /home/furycom/manual-docs/operations/NEXT_SESSION_HANDOFF_V2026-01-26_D.md
+- NEXT_SESSION_HANDOFF_LATEST -> /home/furycom/manual-docs/operations/NEXT_SESSION_HANDOFF_V2026-01-26_E.md
