@@ -20,3 +20,6 @@
 *.pem
 *.token
 operations/_snapshots/
+
+# runtime temp (never commit)
+.run_tmp/
