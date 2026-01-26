@@ -1,192 +1,226 @@
 #!/usr/bin/env bash
-
 # bruce_close_session.sh
-# Génère un NEXT_SESSION_HANDOFF versionné + repoint LATEST + commit.
-# Objectifs: rapide, pas de récursion, timeouts, pas de token affiché.
-# Note: pas de set -euo pipefail.
+# Generate a versioned NEXT_SESSION_HANDOFF + repoint LATEST + git commit.
+# Goals: fast, no recursion, timeouts, never print token.
+# Note: intentionally NO 'set -euo pipefail'.
+
+# --- hard guard against recursion / runaway shells ---
+if [ "${BRUCE_CLOSE_SESSION_RUNNING:-0}" = "1" ]; then
+  echo "[ERROR] bruce_close_session: recursion detected (BRUCE_CLOSE_SESSION_RUNNING=1). Aborting."
+  exit 2
+fi
+export BRUCE_CLOSE_SESSION_RUNNING=1
+
+# If shell nesting is already crazy, abort early.
+shlvl="${SHLVL:-0}"
+case "$shlvl" in
+  ''|*[!0-9]*) shlvl=0 ;;
+esac
+if [ "$shlvl" -ge 50 ]; then
+  echo "[ERROR] bruce_close_session: SHLVL too high (${shlvl}). Aborting."
+  exit 3
+fi
 
 REPO="/home/furycom/manual-docs"
 OPS="${REPO}/operations"
 
 BASE="http://192.168.2.230:4000"
-MAX_TIME="8"
-
-TMP_DIR="/tmp"
-F_HEALTH="${TMP_DIR}/mcp_health.json"
-F_METRICS="${TMP_DIR}/mcp_metrics.json"
-F_LASTSEEN="${TMP_DIR}/mcp_last_seen.json"
-F_DOCKERSUM="${TMP_DIR}/mcp_docker_sum.json"
-F_ISSUES="${TMP_DIR}/mcp_issues.json"
+MAX_TIME="6"        # per curl
+OVERALL_TIMEOUT="60" # whole run
 
 now_utc="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 day_utc="$(date -u +"%Y-%m-%d")"
-stamp_utc="$(date -u +"%H%M%S")"
+stamp_utc="$(date -u +"%H%M%SZ")"
 
 branch="$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")"
 head_before="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 
-# --- token (safe, no print) ---
+# temp files unique per run
+pid="$$"
+F_HEALTH="/tmp/mcp_health_${pid}.json"
+F_METRICS="/tmp/mcp_metrics_${pid}.json"
+F_LASTSEEN="/tmp/mcp_last_seen_${pid}.json"
+F_DOCKERSUM="/tmp/mcp_docker_sum_${pid}.json"
+F_ISSUES="/tmp/mcp_issues_${pid}.json"
+
+cleanup() {
+  rm -f "$F_HEALTH" "$F_METRICS" "$F_LASTSEEN" "$F_DOCKERSUM" "$F_ISSUES" 2>/dev/null || true
+  unset BRUCE_CLOSE_SESSION_RUNNING
+}
+trap cleanup EXIT
+
+# token (never print)
 TOKEN="$(docker exec mcp-gateway sh -lc 'printf %s "$BRUCE_AUTH_TOKEN"' 2>/dev/null | tr -d '\r\n')"
 
-# --- helper: curl to file ---
 curl_to_file() {
   # $1=url $2=outfile $3=header(optional)
   local url="$1"
   local out="$2"
-  local hdr="$3"
+  local hdr="${3:-}"
+
+  : > "$out" 2>/dev/null || true
 
   if [ -n "$hdr" ]; then
-    curl -sS --max-time "$MAX_TIME" -H "$hdr" -o "$out" "$url" 2>/dev/null
+    curl -sS --max-time "$MAX_TIME" -H "$hdr" -o "$out" "$url" 2>/dev/null || true
   else
-    curl -sS --max-time "$MAX_TIME" -o "$out" "$url" 2>/dev/null
+    curl -sS --max-time "$MAX_TIME" -o "$out" "$url" 2>/dev/null || true
   fi
 
-  # normalize CRLF -> LF
-  tr -d '\r' < "$out" > "${out}.tmp" 2>/dev/null
-  mv -f "${out}.tmp" "$out" 2>/dev/null
+  # normalize CRLF -> LF (safe even if empty)
+  tr -d '\r' < "$out" > "${out}.tmp" 2>/dev/null || true
+  mv -f "${out}.tmp" "$out" 2>/dev/null || true
 }
 
-# --- collect MCP responses (files) ---
-: > "$F_HEALTH"
-: > "$F_METRICS"
-: > "$F_LASTSEEN"
-: > "$F_DOCKERSUM"
-: > "$F_ISSUES"
+curl_dbg() {
+  # $1=url $2=header(optional)
+  local url="$1"
+  local hdr="${2:-}"
+  if [ -n "$hdr" ]; then
+    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "$hdr" "$url" 2>/dev/null || echo "http=000 bytes=0"
+  else
+    curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" "$url" 2>/dev/null || echo "http=000 bytes=0"
+  fi
+}
 
-curl_to_file "${BASE}/health" "$F_HEALTH" ""
-curl_to_file "${BASE}/bruce/rag/metrics" "$F_METRICS" "X-BRUCE-TOKEN: ${TOKEN}"
-curl_to_file "${BASE}/bruce/introspect/last-seen" "$F_LASTSEEN" "X-BRUCE-TOKEN: ${TOKEN}"
-curl_to_file "${BASE}/bruce/introspect/docker/summary" "$F_DOCKERSUM" "X-BRUCE-TOKEN: ${TOKEN}"
-curl_to_file "${BASE}/bruce/issues/open" "$F_ISSUES" "X-BRUCE-TOKEN: ${TOKEN}"
+run_all() {
+  # Collect MCP responses
+  curl_to_file "${BASE}/health" "$F_HEALTH" ""
+  curl_to_file "${BASE}/bruce/rag/metrics" "$F_METRICS" "X-BRUCE-TOKEN: ${TOKEN}"
+  curl_to_file "${BASE}/bruce/introspect/last-seen" "$F_LASTSEEN" "X-BRUCE-TOKEN: ${TOKEN}"
+  curl_to_file "${BASE}/bruce/introspect/docker/summary" "$F_DOCKERSUM" "X-BRUCE-TOKEN: ${TOKEN}"
+  curl_to_file "${BASE}/bruce/issues/open" "$F_ISSUES" "X-BRUCE-TOKEN: ${TOKEN}"
 
-# --- http/bytes debug (no body) ---
-health_dbg="$(curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" "${BASE}/health" 2>/dev/null)"
-metrics_dbg="$(curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "X-BRUCE-TOKEN: ${TOKEN}" "${BASE}/bruce/rag/metrics" 2>/dev/null)"
-issues_dbg="$(curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "X-BRUCE-TOKEN: ${TOKEN}" "${BASE}/bruce/issues/open" 2>/dev/null)"
-last_seen_dbg="$(curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "X-BRUCE-TOKEN: ${TOKEN}" "${BASE}/bruce/introspect/last-seen" 2>/dev/null)"
-docker_sum_dbg="$(curl -sS --max-time "$MAX_TIME" -o /dev/null -w "http=%{http_code} bytes=%{size_download}" -H "X-BRUCE-TOKEN: ${TOKEN}" "${BASE}/bruce/introspect/docker/summary" 2>/dev/null)"
+  health_dbg="$(curl_dbg "${BASE}/health" "")"
+  metrics_dbg="$(curl_dbg "${BASE}/bruce/rag/metrics" "X-BRUCE-TOKEN: ${TOKEN}")"
+  issues_dbg="$(curl_dbg "${BASE}/bruce/issues/open" "X-BRUCE-TOKEN: ${TOKEN}")"
+  last_seen_dbg="$(curl_dbg "${BASE}/bruce/introspect/last-seen" "X-BRUCE-TOKEN: ${TOKEN}")"
+  docker_sum_dbg="$(curl_dbg "${BASE}/bruce/introspect/docker/summary" "X-BRUCE-TOKEN: ${TOKEN}")"
 
-# --- parse issues summary from FILE (robuste) ---
-issues_summary="$(
-  python3 -c '
-import json, sys, pathlib
-p = pathlib.Path("/tmp/mcp_issues.json")
+  # Parse issues summary + decide next step
+  issues_summary_and_next="$(
+    python3 - <<PY 2>/dev/null
+import json, pathlib
+
+p = pathlib.Path("${F_ISSUES}")
 raw = p.read_text(errors="ignore").strip() if p.exists() else ""
-if not raw:
-    print("counts: unavailable (empty response)")
-    sys.exit(0)
-try:
-    obj = json.loads(raw)
-except Exception:
-    print("counts: unavailable (invalid json)")
-    sys.exit(0)
-
-data = obj.get("data") if isinstance(obj, dict) else None
-if not isinstance(data, list):
-    print("counts: unavailable (no data array)")
-    sys.exit(0)
-
 crit = 0
 warn = 0
 crit_lines = []
-for it in data:
-    sev = (it.get("severity") or "").lower()
-    t = it.get("type")
-    if sev == "critical":
-        crit += 1
-        if t == "pool_status":
-            payload = it.get("payload") or {}
-            pool = payload.get("pool_name")
-            code = payload.get("status_code")
-            crit_lines.append(f"- CRITICAL pool_status: pool={pool} code={code}")
-        elif t == "SERVICE_MISSING":
-            h = it.get("scope1")
-            c = it.get("scope2")
-            crit_lines.append(f"- CRITICAL SERVICE_MISSING: host={h} container={c}")
-        else:
-            msg = (it.get("message") or "")[:140]
-            crit_lines.append(f"- CRITICAL {t}: {msg}")
-    elif sev == "warning":
-        warn += 1
+has_pool_fail = False
+has_service_missing = False
 
-print(f"counts: critical={crit} warning={warn}")
-if crit_lines:
-    print("critical_list:")
-    for line in crit_lines[:10]:
-        print(line)
-' 2>/dev/null
-)"
+if raw:
+    try:
+        obj = json.loads(raw)
+        data = obj.get("data") if isinstance(obj, dict) else None
+        if isinstance(data, list):
+            for it in data:
+                sev = (it.get("severity") or "").lower()
+                t = it.get("type")
+                if sev == "critical":
+                    crit += 1
+                    if t == "pool_status":
+                        has_pool_fail = True
+                        payload = it.get("payload") or {}
+                        pool = payload.get("pool_name")
+                        code = payload.get("status_code")
+                        crit_lines.append(f"- CRITICAL pool_status: pool={pool} code={code}")
+                    elif t == "SERVICE_MISSING":
+                        has_service_missing = True
+                        h = it.get("scope1")
+                        c = it.get("scope2")
+                        crit_lines.append(f"- CRITICAL SERVICE_MISSING: host={h} container={c}")
+                    else:
+                        msg = (it.get("message") or "")[:140]
+                        crit_lines.append(f"- CRITICAL {t}: {msg}")
+                elif sev == "warning":
+                    warn += 1
+    except Exception:
+        raw = ""
 
-# --- heuristic next step ---
-next_step="A) Priorité: TrueNAS pool DEGRADED (FAILING_DEV) -> diagnostiquer disque / état resilver / SMART (sur TrueNAS)."
-if grep -q '"type":"pool_status"' "$F_ISSUES" 2>/dev/null; then
-  next_step="A) Priorité: TrueNAS pool DEGRADED (FAILING_DEV) -> diagnostiquer disque / état resilver / SMART (sur TrueNAS)."
-elif grep -q '"type":"SERVICE_MISSING"' "$F_ISSUES" 2>/dev/null; then
-  next_step="A) Priorité: Docker attendu manquant (SERVICE_MISSING) -> corriger expected vs observed (pourquoi ce container est attendu sur furycomai)."
-else
-  next_step="A) MCP: valider /bruce/issues/open (auth) + décider une action unique basée sur la sortie."
-fi
+if not raw:
+    print("counts: unavailable (empty/invalid response)")
+    print("NEXTSTEP: rerun /home/furycom/bootstrap.sh then retry /bruce/issues/open")
+else:
+    print(f"counts: critical={crit} warning={warn}")
+    if crit_lines:
+        print("critical_list:")
+        for line in crit_lines[:10]:
+            print(line)
+    if has_pool_fail:
+        print("NEXTSTEP: priority TrueNAS pool DEGRADED (FAILING_DEV) -> diagnose disk / resilver / SMART on TrueNAS")
+    elif has_service_missing:
+        print("NEXTSTEP: docker expected/observed mismatch -> why container youthful_pike expected on furycomai but not observed")
+    else:
+        print("NEXTSTEP: no critical -> run /home/furycom/bootstrap.sh and pick one open item")
+PY
+  )"
 
-# --- write handoff ---
-handoff="${OPS}/NEXT_SESSION_HANDOFF_V${day_utc}_${stamp_utc}Z.md"
+  issues_counts="$(printf '%s\n' "$issues_summary_and_next" | sed -n '1,40p')"
+  nextstep="$(printf '%s\n' "$issues_summary_and_next" | grep -E '^NEXTSTEP:' | sed -n '1p' | sed 's/^NEXTSTEP:[ ]*//')"
 
-{
-  echo "# NEXT SESSION HANDOFF — ${day_utc} (AUTO)"
-  echo
-  echo "Date (UTC): ${now_utc}"
-  echo "Repo: ${REPO}"
-  echo "Branch: ${branch}"
-  echo "HEAD (before write): ${head_before}"
-  echo
-  echo "## Objectif (prochaine session)"
-  echo "- Démarrer MCP-first (état observé -> choisir UNE action suivante)."
-  echo "- Assurer que les canoniques LATEST sont cohérents."
-  echo
-  echo "## MCP (collecte)"
-  echo "Base: ${BASE}"
-  echo
-  echo "### MCP http/bytes (debug)"
-  echo "- health:     ${health_dbg}"
-  echo "- metrics:    ${metrics_dbg}"
-  echo "- issues:     ${issues_dbg}"
-  echo "- last-seen:  ${last_seen_dbg}"
-  echo "- docker-sum: ${docker_sum_dbg}"
-  echo
-  echo "Health (raw, court):"
-  if [ -s "$F_HEALTH" ]; then
-    head -c 600 "$F_HEALTH"
+  # Health short (single line)
+  health_short="$(tr -d '\n' < "$F_HEALTH" | cut -c1-260)"
+
+  # Issues preview (bounded) - show first 600 chars
+  issues_preview="$(tr -d '\n' < "$F_ISSUES" | cut -c1-600)"
+
+  out_md="${OPS}/NEXT_SESSION_HANDOFF_V${day_utc}_${stamp_utc}.md"
+  latest_link="${OPS}/NEXT_SESSION_HANDOFF_LATEST.md"
+
+  {
+    echo "# NEXT SESSION HANDOFF — ${day_utc} (AUTO)"
     echo
-  else
-    echo "(empty)"
-  fi
-  echo
-  echo "### Issues ouvertes (résumé)"
-  echo "$issues_summary"
-  echo
-  echo "### Issues preview (borné, 40 lignes)"
-  if [ -s "$F_ISSUES" ]; then
-    sed -n '1,40p' "$F_ISSUES"
-  else
-    echo "(empty)"
-  fi
-  echo
-  echo "## Meilleure prochaine étape (heuristique)"
-  echo "$next_step"
-  echo
-  echo "## Séquence de démarrage (next session) — 1 bloc"
-  echo "Sur \`furymcp\` :"
-  echo "1) \`/home/furycom/bootstrap.sh | sed -n '1,220p'\`"
-  echo "2) Reprendre ici avec la sortie, puis exécuter UNE action (selon \"Meilleure prochaine étape\")."
-} > "$handoff"
+    echo "Date (UTC): ${now_utc}"
+    echo "Repo: ${REPO}"
+    echo "Branch: ${branch}"
+    echo "HEAD (before write): ${head_before}"
+    echo
+    echo "## Objectif (prochaine session)"
+    echo "- Demarrer MCP-first (etat observe -> choisir UNE action suivante)."
+    echo "- Assurer que les canoniques LATEST sont coherents."
+    echo
+    echo "## MCP (collecte)"
+    echo "Base: ${BASE}"
+    echo
+    echo "### MCP http/bytes (debug)"
+    echo "- health:     ${health_dbg}"
+    echo "- metrics:    ${metrics_dbg}"
+    echo "- issues:     ${issues_dbg}"
+    echo "- last-seen:  ${last_seen_dbg}"
+    echo "- docker-sum: ${docker_sum_dbg}"
+    echo
+    echo "Health (raw, court):"
+    echo "${health_short}"
+    echo
+    echo "### Issues ouvertes (resume)"
+    printf '%s\n' "$issues_counts" | sed -n '1,60p'
+    echo
+    echo "### Issues preview (borne, 600 chars)"
+    echo "${issues_preview}"
+    echo
+    echo "## Meilleure prochaine etape (heuristique)"
+    echo "${nextstep}"
+    echo
+    echo "## Sequence de demarrage (next session) — 1 bloc"
+    echo "Sur \`furymcp\` :"
+    echo "1) \`/home/furycom/bootstrap.sh | sed -n '1,220p'\`"
+    echo "2) Reprendre ici avec la sortie, puis executer UNE action (selon \"Meilleure prochaine etape\")."
+  } > "$out_md"
 
-# repoint LATEST
-ln -sfn "$(basename "$handoff")" "${OPS}/NEXT_SESSION_HANDOFF_LATEST.md"
+  # repoint LATEST
+  ln -sfn "$(basename "$out_md")" "$latest_link" 2>/dev/null || true
 
-# commit
-git -C "$REPO" add "$handoff" "${OPS}/NEXT_SESSION_HANDOFF_LATEST.md" >/dev/null 2>&1
-git -C "$REPO" commit -m "ops: close session ${day_utc} (AUTO)" >/dev/null 2>&1
+  # git commit
+  git -C "$REPO" add "$out_md" "$latest_link" 2>/dev/null || true
+  git -C "$REPO" commit -m "ops: close session ${day_utc} (AUTO)" >/dev/null 2>&1 || true
 
-echo "[OK] session closed"
-echo "[OK] wrote: ${handoff}"
-echo "[OK] repointed: ${OPS}/NEXT_SESSION_HANDOFF_LATEST.md -> $(basename "$handoff")"
-echo "[OK] committed on ${branch} ($(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown"))"
+  head_after="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+
+  echo "[OK] session closed"
+  echo "[OK] wrote: ${out_md}"
+  echo "[OK] repointed: ${latest_link} -> $(readlink -f "$latest_link" 2>/dev/null || echo unknown)"
+  echo "[OK] committed on ${branch} (${head_before} -> ${head_after})"
+}
+
+timeout "${OVERALL_TIMEOUT}" bash -c run_all 2>/dev/null || run_all
