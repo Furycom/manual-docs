@@ -17,6 +17,7 @@ critical_list:
 - CRITICAL pool_status: pool=RZ1-5TB-4X code=FAILING_DEV
 
 ## Meilleure prochaine action
+Priorité BRUCE-only: corriger `SERVICE_MISSING` sur `furycomai` (container `youthful_pike`). TrueNAS: deferred.
 Priorite: TrueNAS pool RZ1-5TB-4X DEGRADED (FAILING_DEV) -> diagnostiquer disque / resilver / SMART (sur TrueNAS).
 
 ## Notes (bornes)
