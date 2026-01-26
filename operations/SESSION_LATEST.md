@@ -1,19 +1,24 @@
 # SESSION LATEST — 2026-01-26
 
-## Résumé
-- Clôture automatique de session.
-- Génération handoff: NEXT_SESSION_HANDOFF_V2026-01-26_E.md
-- Collecte MCP: health/issues/metrics + debug http/bytes.
+## Resume
+- Session fermee avec generation automatique du handoff (tools/bruce_close_session.sh).
+- Prochaine session: MCP-first (bootstrap -> puis une seule action).
 
-## État Git
-- Repo: /home/furycom/manual-docs
-- Branch: main
-- HEAD (before commit): aac87df
-- Working tree changes (before commit): 1
+## Etat MCP (observe)
+- Base MCP: http://192.168.2.230:4000
 
-## MCP (base)
-- http://192.168.2.230:4000
+### Health (raw, court)
+{"status": "ok", "supabase": {"configured": true, "url": "http://192.168.2.206:3000", "status": "ok", "error": null}, "manual": {"root": "/manual-docs", "accessible": true, "error": null}, "timestamp": "2026-01-26T19:51:15.978Z"}
 
-## Pointeurs LATEST (après clôture)
-- README_SESSION_GUIDE_LATEST -> /home/furycom/manual-docs/operations/README_SESSION_GUIDE_V3.md
-- NEXT_SESSION_HANDOFF_LATEST -> /home/furycom/manual-docs/operations/NEXT_SESSION_HANDOFF_V2026-01-26_E.md
+### Issues ouvertes (resume)
+counts: critical=2 warning=5
+critical_list:
+- CRITICAL SERVICE_MISSING: host=furycomai container=youthful_pike
+- CRITICAL pool_status: pool=RZ1-5TB-4X code=FAILING_DEV
+
+## Meilleure prochaine action
+Priorite: TrueNAS pool RZ1-5TB-4X DEGRADED (FAILING_DEV) -> diagnostiquer disque / resilver / SMART (sur TrueNAS).
+
+## Notes (bornes)
+- last-seen, docker summary, rag metrics collectes dans /tmp (mcp_last_seen.json, mcp_docker_sum.json, mcp_metrics.json).
+- Ne jamais afficher le token BRUCE_AUTH_TOKEN.
