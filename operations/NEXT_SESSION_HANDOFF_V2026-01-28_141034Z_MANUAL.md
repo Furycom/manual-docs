@@ -16,20 +16,22 @@ Health (dernier connu):
 
 ## Issues ouvertes (resume)
 counts: critical=13 warning=5
+
 critical_list (BRUCE/docker):
 - SERVICE_MISSING: host=furyssh container=dozzle-agent
 - SERVICE_MISSING: host=furyssh container=speaches
 - SERVICE_MISSING: host=mcp-gateway containers: code-server, dashy, mcp-gateway, mcp-manual, mcp-shell, netdata, ntopng, portainer, termix, uptime-kuma
+
 critical_list (deferred, hors BRUCE):
 - TrueNAS pool_status: pool=RZ1-5TB-4X code=FAILING_DEV (DEGRADED)
 
 ## Issues preview (BRUCE-only, interpretation courte)
-- Les “SERVICE_MISSING” sur hosts  et  sont probablement des faux positifs:
-  -  et  ne listent pas ces hostnames pour .
+- Les “SERVICE_MISSING” sur hosts `mcp-gateway` et `furyssh` sont probablement des faux positifs:
+  - `docker summary` et `last-seen` ne listent pas ces hostnames pour `source_id=docker`.
   - Donc soit (a) attendus hostnames incorrects, (b) hosts non collectés par le collector docker, (c) ancien naming.
 
 ## Meilleure prochaine etape (UNE action)
-BRUCE-only: auditer/corriger  pour  afin d’éliminer les faux CRITICAL.
+BRUCE-only: auditer/corriger `expected_docker_services` pour `hostname in ('mcp-gateway','furyssh')` afin d’éliminer les faux CRITICAL.
 
 ## Sequence de demarrage (next session) — 1 bloc
 Sur `furymcp` :
@@ -54,4 +56,5 @@ where source_id=''docker''
   and ts >= now() - interval ''2 hours''
 order by hostname;
 "'
-```
+````
+
