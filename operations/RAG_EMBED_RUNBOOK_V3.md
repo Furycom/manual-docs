@@ -110,3 +110,20 @@ Chaîne quotidienne (furymcp):
 - `bruce-rag-embed.timer` -> `bruce-rag-embed.service` -> `tools/rag/run_rag_embed_daily.sh`
 - Étapes: sync manual-docs -> ingest manual-docs -> ingest journal -> embed
 
+
+### C) Vérifier que le journal est ingéré (source=journal) (safe)
+
+BRUCE_TOKEN="$(docker exec mcp-gateway sh -lc 'printf %s "$BRUCE_AUTH_TOKEN"' 2>/dev/null || true)"
+test -n "$BRUCE_TOKEN"
+
+curl -fsS --connect-timeout 2 --max-time 12 \
+  -H "Authorization: Bearer $BRUCE_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-raw '{"sql":"select (select count(*)::int from public.bruce_docs where source='\''journal'\'') as journal_docs, (select count(*)::int from public.bruce_chunks c join public.bruce_docs d on d.doc_id=c.doc_id where d.source='\''journal'\'') as journal_chunks, (select count(*)::int from public.bruce_chunks where text ilike '\''%smoke:%'\'' ) as chunks_with_smoke, (select count(*)::int from public.bruce_chunks where text ilike '\''%DISCOVERY%'\'' ) as chunks_with_discovery;"}' \
+  http://127.0.0.1:4000/tools/supabase/exec-sql \
+  | head -c 1600; echo
+
+Attendu:
+- `journal_docs` > 0
+- `journal_chunks` >= `journal_docs`
+- `chunks_with_smoke` et `chunks_with_discovery` > 0 si ces marqueurs existent dans le journal.
