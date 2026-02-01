@@ -109,3 +109,12 @@ Il ingère aussi le contenu de `public.bruce_memory_journal` dans `bruce_docs/br
 Chaîne quotidienne (furymcp):
 - `bruce-rag-embed.timer` -> `bruce-rag-embed.service` -> `tools/rag/run_rag_embed_daily.sh`
 - Étapes: sync manual-docs -> ingest manual-docs -> ingest journal -> embed
+
+## Mise à jour (2026-01-31) — Ingestion du journal (bruce_memory_journal)
+
+Le job quotidien ne fait pas seulement l’ingest des fichiers `manual-docs`.
+Il ingère aussi le contenu de `public.bruce_memory_journal` dans `bruce_docs/bruce_chunks` (source=`journal`), puis calcule les embeddings manquants.
+
+Chaîne quotidienne (furymcp):
+- `bruce-rag-embed.timer` -> `bruce-rag-embed.service` -> `tools/rag/run_rag_embed_daily.sh`
+- Étapes: sync manual-docs -> ingest manual-docs -> ingest journal -> embed
